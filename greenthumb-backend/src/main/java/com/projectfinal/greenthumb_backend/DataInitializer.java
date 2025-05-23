@@ -307,7 +307,9 @@ public class DataInitializer implements CommandLineRunner {
             crearMovimientoStock(p3, ingresoInicial, 100, 0, 100, this.adminGlobal, "Stock inicial Semillas de Albahaca");
             System.out.println("-> Producto creado: " + nombreP3);
         }
+
     }
+
 
     private void crearCostoYPrecioProducto(Producto producto, BigDecimal costo, Administrador admin) {
         if (costoProductoActualRepository.findById(producto.getProductoId()).isEmpty()) {
@@ -339,9 +341,8 @@ public class DataInitializer implements CommandLineRunner {
             Producto prod1 = optProd1.get();
             // Evitar duplicados si se corre varias veces
             if (imagenesProductoRepository.findByProducto(prod1).isEmpty()) {
-                ImagenesProducto img1 = new ImagenesProducto(prod1, "https://via.placeholder.com/300/28a745/ffffff?Text=Helecho1", "Helecho Culantrillo vista frontal", true, 1);
-                ImagenesProducto img2 = new ImagenesProducto(prod1, "https://via.placeholder.com/300/28a745/ffffff?Text=Helecho2", "Helecho Culantrillo detalle hojas", false, 2);
-                imagenesProductoRepository.saveAll(List.of(img1, img2));
+                ImagenesProducto imgP1 = new ImagenesProducto(prod1, "/uploads/helecho.jpg", "Helecho Culantrillo Principal");
+                imagenesProductoRepository.save(imgP1);
                 System.out.println("-> Imágenes creadas para producto: " + prod1.getNombreProducto());
             }
         }
@@ -349,9 +350,18 @@ public class DataInitializer implements CommandLineRunner {
         if (optProd2.isPresent()) {
             Producto prod2 = optProd2.get();
             if (imagenesProductoRepository.findByProducto(prod2).isEmpty()) {
-                ImagenesProducto img1 = new ImagenesProducto(prod2, "https://via.placeholder.com/300/ffc107/000000?Text=Pala1", "Pala de jardín", true, 1);
-                imagenesProductoRepository.save(img1);
+                ImagenesProducto imgP2 = new ImagenesProducto(prod2, "/uploads/paladejardin.jpg", "Pala de jardín");
+                imagenesProductoRepository.save(imgP2);
                 System.out.println("-> Imágenes creadas para producto: " + prod2.getNombreProducto());
+            }
+        }
+        Optional<Producto> optProd3 = productoRepository.findByNombreProducto("Semillas de Albahaca Genovesa");
+        if (optProd3.isPresent()) {
+            Producto prod3 = optProd3.get();
+            if (imagenesProductoRepository.findByProducto(prod3).isEmpty()) {
+                ImagenesProducto imgP3 = new ImagenesProducto(prod3, "/uploads/SemillasdeAlbahacaGenovesa.jpg", "Semillas de Albahaca Genovesa");
+                imagenesProductoRepository.save(imgP3);
+                System.out.println("-> Imágenes creadas para producto: " + prod3.getNombreProducto());
             }
         }
     }

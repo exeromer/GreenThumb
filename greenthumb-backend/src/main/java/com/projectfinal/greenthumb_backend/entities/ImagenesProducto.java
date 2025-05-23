@@ -27,7 +27,7 @@ public class ImagenesProducto {
     public ImagenesProducto() {
     }
 
-    public ImagenesProducto(Producto producto, String urlImagen, String textoAlternativo, boolean esPrincipal, Integer ordenVisualizacion) {
+    public ImagenesProducto(Producto producto, String urlImagen, String textoAlternativo) {
         this.producto = producto;
         this.urlImagen = urlImagen;
         this.textoAlternativo = textoAlternativo;
