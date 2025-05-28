@@ -1,5 +1,9 @@
+// greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/entities/CarritoItem.java
 package com.projectfinal.greenthumb_backend.entities;
+
 import jakarta.persistence.*;
+
+import java.io.Serializable;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -7,16 +11,20 @@ import java.util.Objects;
 
 @Entity
 @Table(name = "carritoitems")
-@IdClass(CarritoItemId.class)
-public class CarritoItem {
+// @IdClass(CarritoItemId.class) // No es necesario si se usa @EmbeddedId
+public class CarritoItem implements Serializable {
 
-    @Id
+    @EmbeddedId
+    private CarritoItemId id;
+
     @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("clienteId") // Mapea clienteId de CarritoItemId
     @JoinColumn(name = "UsuarioID_Cliente", referencedColumnName = "UsuarioID")
     private Cliente cliente;
 
-    @Id
+
     @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("productoId") // Mapea productoId de CarritoItemId
     @JoinColumn(name = "ProductoID")
     private Producto producto;
 
@@ -41,6 +49,15 @@ public class CarritoItem {
         this.producto = producto;
         this.cantidad = cantidad;
         this.precioAlAgregar = precioAlAgregar;
+        this.id = new CarritoItemId(cliente.getUsuarioId(), producto.getProductoId()); // Inicializa el ID compuesto
+    }
+
+    // Constructor con parámetros para usar en la capa de servicio donde el precio se obtiene
+    public CarritoItem(Cliente cliente, Producto producto, Integer cantidad) {
+        this.cliente = cliente;
+        this.producto = producto;
+        this.cantidad = cantidad;
+        this.id = new CarritoItemId(cliente.getUsuarioId(), producto.getProductoId()); // Inicializa el ID compuesto
     }
 
     @PrePersist
@@ -48,6 +65,10 @@ public class CarritoItem {
         LocalDateTime now = LocalDateTime.now();
         this.fechaAgregado = now;
         this.fechaUltimaModificacion = now;
+        // Asegurarse de que el ID compuesto se inicialice si no lo fue en el constructor
+        if (this.id == null && this.cliente != null && this.producto != null) {
+            this.id = new CarritoItemId(this.cliente.getUsuarioId(), this.producto.getProductoId());
+        }
     }
 
     @PreUpdate
@@ -56,12 +77,23 @@ public class CarritoItem {
     }
 
     // Getters y Setters
+    public CarritoItemId getId() {
+        return id;
+    }
+
+    public void setId(CarritoItemId id) {
+        this.id = id;
+    }
+
     public Cliente getCliente() {
         return cliente;
     }
 
     public void setCliente(Cliente cliente) {
         this.cliente = cliente;
+        if (cliente != null && this.producto != null) { // Actualiza el ID compuesto si se cambia el cliente
+            this.id = new CarritoItemId(cliente.getUsuarioId(), this.producto.getProductoId());
+        }
     }
 
     public Producto getProducto() {
@@ -70,6 +102,9 @@ public class CarritoItem {
 
     public void setProducto(Producto producto) {
         this.producto = producto;
+        if (producto != null && this.cliente != null) { // Actualiza el ID compuesto si se cambia el producto
+            this.id = new CarritoItemId(this.cliente.getUsuarioId(), producto.getProductoId());
+        }
     }
 
     public Integer getCantidad() {
@@ -105,24 +140,19 @@ public class CarritoItem {
     }
 
     // equals y hashCode para entidades con claves compuestas
-    // Se basan en los campos que forman la clave primaria.
+    // Se basan en el objeto CarritoItemId id
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         CarritoItem that = (CarritoItem) o;
-        // Compara las entidades Cliente y Producto directamente si están disponibles,
-        // o sus IDs si es más apropiado y están garantizados.
-        return Objects.equals(cliente != null ? cliente.getUsuarioId() : null, that.cliente != null ? that.cliente.getUsuarioId() : null) &&
-                Objects.equals(producto != null ? producto.getProductoId() : null, that.producto != null ? that.producto.getProductoId() : null);
+        return Objects.equals(id, that.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(cliente != null ? cliente.getUsuarioId() : null,
-                producto != null ? producto.getProductoId() : null);
+        return Objects.hash(id);
     }
-
 
     @Override
     public String toString() {
@@ -134,4 +164,3 @@ public class CarritoItem {
                 '}';
     }
 }
-

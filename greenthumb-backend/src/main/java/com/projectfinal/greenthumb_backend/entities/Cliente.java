@@ -1,3 +1,4 @@
+// greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/entities/Cliente.java
 package com.projectfinal.greenthumb_backend.entities;
 
 import jakarta.persistence.*;
@@ -6,6 +7,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import com.projectfinal.greenthumb_backend.listeners.ClienteEntityListener;
+import java.util.Set; // Added import
+import java.util.HashSet; // Added import
 
 
 @Entity
@@ -35,8 +38,10 @@ public class Cliente extends Usuario {
     @OneToMany(mappedBy = "cliente", fetch = FetchType.LAZY)
     private List<Pedido> pedidos = new ArrayList<>();
 
+    // Corrected to use Set<CarritoItem> and named carritoItems
     @OneToMany(mappedBy = "cliente", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    private List<CarritoItem> itemsCarrito = new ArrayList<>();
+    private Set<CarritoItem> carritoItems = new HashSet<>();
+
 
     // Constructores
     public Cliente() {
@@ -149,13 +154,26 @@ public class Cliente extends Usuario {
         this.pedidos = pedidos;
     }
 
-    public List<CarritoItem> getItemsCarrito() {
-        return itemsCarrito;
+    // Corrected getter and setter for carritoItems
+    public Set<CarritoItem> getCarritoItems() {
+        return carritoItems;
     }
 
-    public void setItemsCarrito(List<CarritoItem> itemsCarrito) {
-        this.itemsCarrito = itemsCarrito;
+    public void setItemsCarrito(Set<CarritoItem> carritoItems) { // Renamed from setItemsCarrito
+        this.carritoItems = carritoItems;
     }
+
+    // Optional convenience methods for CarritoItem (highly recommended)
+    public void addCarritoItem(CarritoItem item) {
+        this.carritoItems.add(item);
+        item.setCliente(this);
+    }
+
+    public void removeCarritoItem(CarritoItem item) {
+        this.carritoItems.remove(item);
+        item.setCliente(null);
+    }
+
     @Override
     public String toString() {
         return "Cliente{" +

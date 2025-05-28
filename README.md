@@ -116,6 +116,68 @@ La API sigue el prefijo `/api`. (Anteriormente `/api/v1`, ajustado según tu pre
 
 Consulta el código de los controladores (`CategoriaController`, `ProductoController`) para más detalles sobre los cuerpos de solicitud y respuesta esperados.
 
+## Avances Recientes: Módulo de Carrito de Compras (Mayo 2025)
+
+Hemos logrado un avance significativo al implementar la funcionalidad completa del **carrito de compras**. Esto permite a los usuarios gestionar sus productos deseados antes de la compra final, brindando una experiencia más interactiva y robusta.
+
+### Resumen de Implementación:
+
+* **Lógica del Carrito Centralizada:** Se crearon y modificaron entidades clave como `CarritoItem`, `CarritoItemId`, y se actualizaron las relaciones en `Cliente` y `Producto` para soportar la funcionalidad del carrito.
+* **API REST Robusta:** Se desarrolló un `CarritoService` con validación de stock y se expuso a través de un `CarritoController` con endpoints claros para añadir, obtener, actualizar, eliminar y vaciar el carrito.
+* **Información Detallada en Carrito:** Cada ítem del carrito ahora incluye el nombre del producto, el precio unitario actual (obtenido de `PrecioProductoActual`) y la URL de la imagen principal del producto (gestionada por `ImagenesProducto`).
+* **Consistencia de Datos:** Se estandarizaron los tipos de IDs a `Integer` en todas las capas del módulo para asegurar la coherencia y evitar errores de tipo.
+* **Datos de Prueba Mejorados:** El `DataInitializer` ha sido actualizado para crear datos de prueba más completos, incluyendo administradores y productos con sus imágenes asociadas, facilitando la validación.
+
+### Cómo Probar los Endpoints del Carrito:
+
+Asegúrate de que la aplicación Spring Boot esté corriendo (ver sección "Configuración y Ejecución"). Utiliza **Postman** (recomendado) o tu navegador para enviar peticiones a los siguientes endpoints.
+
+**URL Base del Carrito:** `http://localhost:8080/api/carrito`
+
+Para las pruebas, puedes usar los IDs generados por `DataInitializer` (verifica la consola al inicio de la app o phpMyAdmin). Un cliente de ejemplo tendrá `ID = 1`, y productos como "Monstera Deliciosa" y "Zamioculcas Zamiifolia" tendrán `ID = 1` y `ID = 2` respectivamente.
+
+1.  **Agregar Producto al Carrito**
+    * **Función:** Añade o actualiza la cantidad de un producto en el carrito de un cliente. Incluye validación de stock.
+    * **Método:** `POST`
+    * **URL:** `/{clienteId}/agregar`
+    * **Parámetros (Query):** `productoId={ID_DEL_PRODUCTO}&cantidad={CANTIDAD}`
+    * **Ejemplo:** `POST http://localhost:8080/api/carrito/1/agregar?productoId=1&cantidad=2`
+    * **Respuestas:** `201 Created` (éxito), `400 Bad Request` (stock insuficiente, cantidad inválida), `500 Internal Server Error` (producto/cliente no encontrado).
+
+2.  **Obtener Carrito de un Cliente**
+    * **Función:** Consulta todos los productos en el carrito de un cliente.
+    * **Método:** `GET`
+    * **URL:** `/{clienteId}`
+    * **Ejemplo:** `GET http://localhost:8080/api/carrito/1` (se puede probar en el navegador)
+    * **Respuestas:** `200 OK` (lista de ítems), `204 No Content` (carrito vacío), `404 Not Found` (cliente no encontrado).
+
+3.  **Actualizar Cantidad de Producto en el Carrito**
+    * **Función:** Modifica la cantidad de un producto existente en el carrito.
+    * **Método:** `PUT`
+    * **URL:** `/{clienteId}/actualizar`
+    * **Parámetros (Query):** `productoId={ID_DEL_PRODUCTO}&nuevaCantidad={NUEVA_CANTIDAD}`
+    * **Ejemplo:** `PUT http://localhost:8080/api/carrito/1/actualizar?productoId=1&nuevaCantidad=5`
+    * **Respuestas:** `200 OK` (ítem actualizado), `204 No Content` (si `nuevaCantidad` es 0 y se elimina el ítem), `400 Bad Request` (stock insuficiente), `404 Not Found` (ítem no encontrado en el carrito).
+
+4.  **Eliminar Producto del Carrito**
+    * **Función:** Quita un producto específico del carrito de un cliente.
+    * **Método:** `DELETE`
+    * **URL:** `/{clienteId}/eliminar/{productoId}`
+    * **Ejemplo:** `DELETE http://localhost:8080/api/carrito/1/eliminar/2`
+    * **Respuestas:** `204 No Content` (éxito), `404 Not Found` (ítem no encontrado).
+
+5.  **Vaciar Carrito Completo**
+    * **Función:** Elimina todos los productos del carrito de un cliente.
+    * **Método:** `DELETE`
+    * **URL:** `/{clienteId}/vaciar`
+    * **Ejemplo:** `DELETE http://localhost:8080/api/carrito/1/vaciar`
+    * **Respuestas:** `204 No Content` (éxito), `404 Not Found` (cliente no encontrado).
+
+**Verificación en Base de Datos (phpMyAdmin):** Después de cada prueba, puedes acceder a phpMyAdmin y ejecutar `SELECT * FROM carritoitems;` para confirmar que los cambios se reflejan en la tabla.
+
+---
+
+
 ## Próximos Pasos (Desarrollo)
 
 * Implementación de endpoints para Carrito de Compras.

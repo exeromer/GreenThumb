@@ -1,33 +1,36 @@
+// greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/entities/CarritoItemId.java
 package com.projectfinal.greenthumb_backend.entities;
+import jakarta.persistence.Embeddable; // Importar Embeddable
+
 import java.io.Serializable;
 import java.util.Objects;
-
+@Embeddable // Añadir esta anotación
 public class CarritoItemId implements Serializable {
-    private Integer cliente; // Coincide con el tipo de Usuario.usuarioId (PK de Cliente)
-    private Integer producto; // Coincide con el tipo de Producto.productoId
+    private Integer clienteId; // Cambiado a clienteId para consistencia
+    private Integer productoId; // Cambiado a productoId para consistencia
 
     // Constructor
     public CarritoItemId() {
     }
 
     public CarritoItemId(Integer clienteId, Integer productoId) {
-        this.cliente = clienteId;
-        this.producto = productoId;
+        this.clienteId = clienteId;
+        this.productoId = productoId;
     }
 
     // Getters
-    public Integer getCliente() {
-        return cliente;
+    public Integer getClienteId() { // Cambiado a getClienteId
+        return clienteId;
     }
-    public void setCliente(Integer cliente) {
-        this.cliente = cliente;
+    public void setClienteId(Integer clienteId) { // Cambiado a setClienteId
+        this.clienteId = clienteId;
     }
 
-    public Integer getProducto() {
-        return producto;
+    public Integer getProductoId() { // Cambiado a getProductoId
+        return productoId;
     }
-    public void setProducto(Integer producto) {
-        this.producto = producto;
+    public void setProductoId(Integer productoId) { // Cambiado a setProductoId
+        this.productoId = productoId;
     }
 
 
@@ -36,13 +39,12 @@ public class CarritoItemId implements Serializable {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         CarritoItemId that = (CarritoItemId) o;
-        return Objects.equals(cliente, that.cliente) &&
-                Objects.equals(producto, that.producto);
+        return Objects.equals(clienteId, that.clienteId) &&
+                Objects.equals(productoId, that.productoId);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(cliente, producto);
+        return Objects.hash(clienteId, productoId);
     }
 }
-

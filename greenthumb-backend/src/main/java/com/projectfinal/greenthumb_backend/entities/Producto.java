@@ -1,9 +1,12 @@
+// greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/entities/Producto.java
 package com.projectfinal.greenthumb_backend.entities;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set; // Add this import
+import java.util.HashSet; // Add this import
 
 @Entity
 @Table(name = "productos")
@@ -32,7 +35,7 @@ public class Producto {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "TipoProductoID",referencedColumnName = "TipoProductoID" , nullable = false)
-    private TipoProducto tipoProducto; // Asegúrate que TipoProducto.java esté correcto y en el paquete
+    private TipoProducto tipoProducto;
 
     @Column(name = "FechaAlta", nullable = false, updatable = false)
     private LocalDateTime fechaAlta;
@@ -53,12 +56,19 @@ public class Producto {
     @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<CostoProductoHistorial> historialCostos = new ArrayList<>();
 
+    // Added OneToMany relationship for CarritoItem
+    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private Set<CarritoItem> carritoItems = new HashSet<>();
+
+    // Added OneToMany relationship for ImagenesProducto
+    @OneToMany(mappedBy = "producto", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private List<ImagenesProducto> imagenes = new ArrayList<>();
+
 
     // Constructores
     public Producto() {
     }
 
-    // Constructor actualizado sin SKU ni Proveedor
     public Producto(String nombreProducto, String descripcionGeneral, Integer stockActual, Integer puntoDeReorden, Categoria categoria, TipoProducto tipoProducto) {
         this.nombreProducto = nombreProducto;
         this.descripcionGeneral = descripcionGeneral;
@@ -214,25 +224,48 @@ public class Producto {
         costoHistorial.setProducto(null);
     }
 
+    // Getter y Setter para carritoItems
+    public Set<CarritoItem> getCarritoItems() {
+        return carritoItems;
+    }
+
+    public void setCarritoItems(Set<CarritoItem> carritoItems) {
+        this.carritoItems = carritoItems;
+    }
+
+    // Getters y Setters para imagenes
+    public List<ImagenesProducto> getImagenes() {
+        return imagenes;
+    }
+
+    public void setImagenes(List<ImagenesProducto> imagenes) {
+        this.imagenes = imagenes;
+    }
+
+    // Métodos de conveniencia para manejar imágenes
+    public void addImagen(ImagenesProducto imagen) {
+        this.imagenes.add(imagen);
+        imagen.setProducto(this);
+    }
+
+    public void removeImagen(ImagenesProducto imagen) {
+        this.imagenes.remove(imagen);
+        imagen.setProducto(null);
+    }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof Producto)) return false;
         Producto producto = (Producto) o;
-        // Si el productoId es nulo (antes de persistir), no se puede comparar por ID.
-        // Se podría usar una clave de negocio si existiera y fuera inmutable.
-        // Por ahora, si productoId es nulo, solo son iguales si son la misma instancia.
         if (productoId == null) {
-            return super.equals(o); // O return false si o es también un Producto con id null pero diferente instancia
+            return super.equals(o);
         }
         return Objects.equals(getProductoId(), producto.getProductoId());
     }
 
     @Override
     public int hashCode() {
-        // Si productoId es nulo, usa el hashcode de la superclase (Object).
-        // Una vez que tiene ID, el hashcode se basa en el ID.
         return productoId != null ? Objects.hash(getProductoId()) : super.hashCode();
     }
 

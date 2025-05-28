@@ -1,3 +1,4 @@
+// greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/entities/PrecioProductoActual.java
 package com.projectfinal.greenthumb_backend.entities;
 
 import jakarta.persistence.*;
@@ -68,7 +69,7 @@ public class PrecioProductoActual {
         }
     }
 
-    public BigDecimal getPrecioVenta() {
+    public BigDecimal getPrecioVenta() { // Se usa getPrecioVenta
         return precioVenta;
     }
 
