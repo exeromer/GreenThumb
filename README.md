@@ -7,7 +7,7 @@ Bienvenido al backend del proyecto GreenThumb Market. Esta aplicación está con
 "GreenThumb Market" es una plataforma de compra en línea especializada en la venta de plantas de interior y exterior, semillas, herramientas de jardinería y accesorios relacionados. El objetivo es crear un sistema robusto y fácil de usar que permita a los aficionados y profesionales de la jardinería adquirir productos de calidad.
 
 Este backend maneja:
-* Gestión de Usuarios (Clientes y Administradores) 
+* Gestión de Usuarios (Clientes y Administradores)
 * Catálogo de Productos (Plantas, Herramientas, Semillas) con detalles específicos
 * Categorización y Tipos de Producto
 * Gestión de Precios (actuales e históricos) y Costos
@@ -173,10 +173,33 @@ Para las pruebas, puedes usar los IDs generados por `DataInitializer` (verifica 
     * **Ejemplo:** `DELETE http://localhost:8080/api/carrito/1/vaciar`
     * **Respuestas:** `204 No Content` (éxito), `404 Not Found` (cliente no encontrado).
 
-**Verificación en Base de Datos (phpMyAdmin):** Después de cada prueba, puedes acceder a phpMyAdmin y ejecutar `SELECT * FROM carritoitems;` para confirmar que los cambios se reflejan en la tabla.
+6.  **Confirmar Checkout (Crear Pedido desde Carrito)**
+    * **Función:** Convierte los ítems del carrito de un cliente en un pedido final, ajustando el stock de los productos.
+    * **Método:** `POST`
+    * **URL:** `/{clienteId}/checkout`
+    * **Headers:** `Content-Type: application/json`
+    * **Body (raw, JSON):**
+        ```json
+        {
+            "metodoPago": "Tarjeta de Credito",
+            "notasCliente": "Entregar antes de las 5 PM."
+        }
+        ```
+    * **Ejemplo:** `POST http://localhost:8080/api/carrito/1/checkout`
+    * **Respuestas:**
+        * `201 Created`: Pedido creado exitosamente. Retorna los detalles del `PedidoDTO`.
+        * `400 Bad Request`: Carrito vacío, stock insuficiente para algún producto, o datos de entrada inválidos.
+        * `415 Unsupported Media Type`: Si el `Content-Type` de la solicitud no es `application/json`.
+        * `500 Internal Server Error`: Errores internos (ej. cliente no encontrado, tipos de movimiento o estados de pedido no configurados correctamente en `DataInitializer`).
+    * **Verificación Post-Checkout:**
+        * **Base de datos:** Confirma la creación de nuevos registros en las tablas `pedidos` y `detallespedido`.
+        * **Stock:** Verifica que el `stockActual` en la tabla `productos` se haya reducido.
+        * **Movimientos de Stock:** Revisa la tabla `movimientosstock` para ver los registros de tipo "Venta Cliente".
+        * **Carrito:** Confirma que la tabla `carritoitems` ya no contiene los ítems del cliente procesado.
+
+**Verificación en Base de Datos (phpMyAdmin):** Después de cada prueba, puedes acceder a phpMyAdmin y ejecutar `SELECT * FROM carritoitems;`, `SELECT * FROM pedidos;`, `SELECT * FROM detallespedido;`, `SELECT * FROM productos;`, `SELECT * FROM movimientosstock;` para confirmar que los cambios se reflejan en las tablas.
 
 ---
-
 
 ## Próximos Pasos (Desarrollo)
 
