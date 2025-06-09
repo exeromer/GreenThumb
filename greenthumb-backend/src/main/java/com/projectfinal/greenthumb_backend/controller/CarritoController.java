@@ -1,7 +1,8 @@
-// greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/controller/CarritoController.java
+
 package com.projectfinal.greenthumb_backend.controller;
 
 import com.projectfinal.greenthumb_backend.dto.CarritoItemDTO;
+import com.projectfinal.greenthumb_backend.dto.PedidoDTO;
 import com.projectfinal.greenthumb_backend.service.CarritoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -9,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/carrito")
@@ -96,6 +98,25 @@ public class CarritoController {
         } catch (RuntimeException e) {
             e.printStackTrace();
             return new ResponseEntity<>(HttpStatus.NOT_FOUND);
+        }
+    } 
+    
+    // Nuevo endpoint para checkout (confirmar carrito como pedido)
+    @PostMapping("/{clienteId}/checkout")
+    public ResponseEntity<?> checkoutCarrito(
+            @PathVariable Integer clienteId,
+            @RequestBody Map<String, String> checkoutRequest) {
+        try {
+            String metodoPago = checkoutRequest.get("metodoPago");
+            String notasCliente = checkoutRequest.get("notasCliente"); // Puede ser null
+
+            PedidoDTO pedidoConfirmado = carritoService.confirmarCarritoComoPedido(clienteId, metodoPago, notasCliente);
+            return new ResponseEntity<>(pedidoConfirmado, HttpStatus.CREATED);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        } catch (RuntimeException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error al procesar el pedido: " + e.getMessage()));
         }
     }
 }
