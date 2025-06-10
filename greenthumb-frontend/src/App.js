@@ -1,20 +1,18 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext';
-import { CartProvider } from './context/CartContext';
+import './App.css';
 import Navbar from './components/Navbar';
 import AppRoutes from './routes';
+import UserSyncManager from './components/UserSyncManager';
 
 function App() {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <BrowserRouter>
-          <Navbar />
-          <AppRoutes />
-        </BrowserRouter>
-      </CartProvider>
-    </AuthProvider>
+    <>
+      <UserSyncManager />
+      <Navbar />
+      <main>
+        <AppRoutes />
+      </main>
+    </>
   );
 }
 

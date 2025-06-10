@@ -1,34 +1,52 @@
 import React from 'react';
-import { AppBar, Toolbar, Typography, Button, IconButton } from '@mui/material';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth0 } from '@auth0/auth0-react';
+import './Navbar.css';
 
-export default function Navbar() {
-    const { user, logout } = useAuth();
+const Navbar = () => {
+    const { loginWithRedirect, logout, isAuthenticated, user } = useAuth0();
 
     return (
-        <AppBar position="static">
-            <Toolbar>
-                <Typography variant="h6" component={Link} to="/" sx={{ flexGrow: 1, color: 'inherit', textDecoration: 'none' }}>
+        <nav className="navbar">
+            <div className="navbar-container">
+                <Link to="/" className="navbar-logo">
                     GreenThumb
-                </Typography>
-                <Button color="inherit" component={Link} to="/">Catálogo</Button>
-                <IconButton color="inherit" component={Link} to="/carrito">
-                    <ShoppingCartIcon />
-                </IconButton>
-                {user ? (
-                    <>
-                        {user.rol === 'admin' && <Button color="inherit" component={Link} to="/admin">Admin</Button>}
-                        <Button color="inherit" onClick={logout}>Salir</Button>
-                    </>
-                ) : (
-                    <>
-                        <Button color="inherit" component={Link} to="/login">Ingresar</Button>
-                        <Button color="inherit" component={Link} to="/register">Registrarse</Button>
-                    </>
-                )}
-            </Toolbar>
-        </AppBar>
+                </Link>
+                <ul className="nav-menu">
+                    <li className="nav-item">
+                        <Link to="/catalogo" className="nav-links">
+                            CATÁLOGO
+                        </Link>
+                    </li>
+                    <li className="nav-item">
+                        <Link to="/carrito" className="nav-links">
+                            🛒
+                        </Link>
+                    </li>
+                    {isAuthenticated ? (
+                        <>
+                            <li className="nav-item">
+                                <span className="nav-links user-email">{user.name}</span>
+                            </li>
+                            <li className="nav-item">
+                                <button onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })} className="nav-links-button">
+                                    SALIR
+                                </button>
+                            </li>
+                        </>
+                    ) : (
+                        <>
+                            <li className="nav-item">
+                                <button onClick={() => loginWithRedirect()} className="nav-links-button">
+                                    INGRESAR
+                                </button>
+                            </li>
+                        </>
+                    )}
+                </ul>
+            </div>
+        </nav>
     );
-}
+};
+
+export default Navbar;

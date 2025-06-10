@@ -6,6 +6,8 @@ import CartPage from './pages/CartPage';
 import Login from './components/Login';
 import Register from './components/Register';
 import AdminPage from './pages/AdminPage';
+import RegistroCompletoPage from './pages/RegistroCompletoPage';
+
 
 export default function AppRoutes() {
     return (
@@ -16,6 +18,7 @@ export default function AppRoutes() {
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/completar-registro" element={<RegistroCompletoPage />} />
         </Routes>
     );
 }

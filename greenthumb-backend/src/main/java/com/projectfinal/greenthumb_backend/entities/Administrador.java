@@ -23,8 +23,8 @@ public class Administrador extends Usuario {
         super();
     }
     public Administrador(String nombre, String apellido, String email, String contrasena, String telefono,
-                         String nivelAcceso) {
-        super(nombre, apellido, email, contrasena, telefono);
+                         String nivelAcceso,String auth0Id) {
+        super(nombre, apellido, email, contrasena, telefono,auth0Id);
         this.nivelAcceso = nivelAcceso;
     }
     // Getters y Setters (como los tenías)

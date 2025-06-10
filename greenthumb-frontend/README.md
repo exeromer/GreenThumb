@@ -1,70 +1,68 @@
-# Getting Started with Create React App
+# GreenThumb E-Commerce - Frontend 🌿
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Esta es la aplicación de cliente (frontend) para el proyecto GreenThumb. Es una Single Page Application (SPA) construida con React que consume la API del backend.
 
-## Available Scripts
+## Tecnologías Utilizadas
+* **React 18**
+* **React Router** - Para la navegación y el manejo de rutas.
+* **Auth0 React SDK** - Para integrar la autenticación y el login con Auth0.
+* **CSS** - Para los estilos.
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## Configuración del Entorno
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+Para poder ejecutar el proyecto, necesitas crear un archivo de configuración para las variables de entorno.
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+1.  En la raíz de la carpeta `greenthumb-frontend`, crea un archivo llamado **`.env`**.
+2.  Pega el siguiente contenido en el archivo `.env` y reemplaza los valores con tus propias credenciales de Auth0.
 
-### `npm test`
+    ```env
+    # URL base de la API del backend
+    REACT_APP_API_URL=http://localhost:8080/api
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+    # --- Credenciales de Auth0 ---
+    # Obtenidas del panel de Auth0, en Applications -> Applications -> [Tu App de tipo Single Page Application]
 
-### `npm run build`
+    # Dominio de tu tenant de Auth0
+    REACT_APP_AUTH0_DOMAIN=TU_DOMINIO_AUTH0
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+    # Client ID de tu aplicación SPA en Auth0
+    REACT_APP_AUTH0_CLIENT_ID=TU_CLIENT_ID_SPA
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+    # Audience (Identificador) de la API que creaste en Auth0 (debe ser el mismo que en el backend)
+    REACT_APP_AUTH0_AUDIENCE=[https://api.greenthumb.com](https://api.greenthumb.com)
+    ```
+    **Importante:** Nunca subas tu archivo `.env` a un repositorio público de Git.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+---
 
-### `npm run eject`
+## Cómo Ejecutar la Aplicación
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+1.  **Clona el repositorio.**
+2.  **Configura** el archivo `.env` como se describió anteriormente.
+3.  Abre una terminal en la carpeta `greenthumb-frontend` y ejecuta el siguiente comando para instalar las dependencias:
+    ```bash
+    npm install
+    ```
+4.  Una vez finalizada la instalación, ejecuta el siguiente comando para iniciar la aplicación:
+    ```bash
+    npm start
+    ```
+La aplicación se abrirá automáticamente en tu navegador en `http://localhost:3000`.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+---
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## Cuentas de Prueba
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Puedes usar las siguientes cuentas (previamente creadas en Auth0) para probar la aplicación.
 
-## Learn More
+* **Usuario Administrador:**
+    * **Email:** `luisluis@admin.com`
+    * **Contraseña:** `Hola1234`
+    *(Este usuario tiene el rol "ADMIN" en Auth0 y podrá acceder a futuras funcionalidades de administración).*
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+* **Usuarios Clientes:**
+    * **Email:** `anagarcia@example.com` / `cristianoronaldo@cliente.com`
+    * **Contraseña:** `Hola1234`
+    *(Estos usuarios serán redirigidos para completar su perfil la primera vez que inicien sesión).*
