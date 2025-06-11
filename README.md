@@ -199,6 +199,72 @@ Para las pruebas, puedes usar los IDs generados por `DataInitializer` (verifica 
 
 **Verificación en Base de Datos (phpMyAdmin):** Después de cada prueba, puedes acceder a phpMyAdmin y ejecutar `SELECT * FROM carritoitems;`, `SELECT * FROM pedidos;`, `SELECT * FROM detallespedido;`, `SELECT * FROM productos;`, `SELECT * FROM movimientosstock;` para confirmar que los cambios se reflejan en las tablas.
 
+¡Excelente iniciativa de hacer un commit descriptivo! Es crucial para mantener un historial de proyecto claro.
+
+Aquí tienes mis sugerencias para el README.md y el mensaje de commit, considerando los cambios que has hecho para integrar Mercado Pago en modo de prueba:
+
+Sugerencias para README.md
+Añade una nueva sección o actualiza una existente (ej. "Configuración" o "Características") con la siguiente información:
+
+Integración con Mercado Pago (Modo Prueba)
+Este backend incluye una integración con la API de Mercado Pago para la creación de preferencias de pago y la simulación de webhooks, exclusivamente para propósitos de prueba y desarrollo. No está configurado para procesar pagos reales en este momento.
+
+Configuración:
+
+Para utilizar la integración de Mercado Pago, asegúrate de configurar las siguientes propiedades en greenthumb-backend/src/main/resources/application.properties:
+
+Properties
+
+mercadopago.access_token=YOUR_MERCADO_PAGO_ACCESS_TOKEN
+mercadopago.client_id=YOUR_MERCADO_PAGO_CLIENT_ID
+mercadopago.client_secret=YOUR_MERCADO_PAGO_CLIENT_SECRET
+Puedes obtener las credenciales de prueba desde tu cuenta de desarrollador de Mercado Pago.
+Endpoints Disponibles:
+
+POST /api/mercadopago/create-preference:
+
+Descripción: Permite crear una preferencia de pago en Mercado Pago. Recibe detalles de los ítems del carrito y URLs de redirección.
+Cuerpo de la Solicitud (Ejemplo):
+JSON
+
+{
+    "clienteId": 1,
+    "metodoPago": "MercadoPago",
+    "notasCliente": "Pago online de prueba",
+    "successUrl": "http://localhost:3000/pago-exitoso",
+    "failureUrl": "http://localhost:3000/pago-fallido",
+    "pendingUrl": "http://localhost:3000/pago-pendiente",
+    "items": [
+        {
+            "id": "1",
+            "title": "Producto de Prueba 1",
+            "description": "Descripción del Producto 1",
+            "quantity": 1,
+            "unitPrice": 10.00
+        }
+    ]
+}
+Respuesta: Retorna el ID de la preferencia de Mercado Pago, así como init_point y sandbox_init_point (URL para redirigir al usuario al flujo de pago de Mercado Pago).
+POST /api/mercadopago/webhook:
+
+Descripción: Este endpoint simula la recepción de notificaciones IPN (Instant Payment Notification) de Mercado Pago. En un entorno real, Mercado Pago enviaría automáticamente un payload a esta URL para informar sobre el estado de un pago (aprobado, pendiente, rechazado, etc.).
+Uso para Pruebas: Puedes enviar manualmente un POST a este endpoint (por ejemplo, con Postman) para simular diferentes estados de pago.
+Cuerpo de la Solicitud (Ejemplo para un pago aprobado):
+JSON
+
+{
+    "id": "PAYMENT_ID_SIMULADO",
+    "topic": "payment",
+    "resource": "https://api.mercadopago.com/v1/payments/PAYMENT_ID_SIMULADO",
+    "type": "payment",
+    "data": {
+        "id": "PAYMENT_ID_SIMULADO",
+        "status": "approved",
+        "external_reference": "ID_DE_PREFERENCIA_O_PEDIDO"
+    }
+}
+
+
 ---
 
 ## Próximos Pasos (Desarrollo)

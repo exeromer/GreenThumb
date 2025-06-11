@@ -26,6 +26,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/productos/**").permitAll()
+                        .requestMatchers("/api/mercadopago/**").permitAll() // mercado pago, corregir despues
                         .requestMatchers(HttpMethod.GET, "/api/categorias/**").permitAll()
                         .requestMatchers("/api/usuarios/me", "/api/usuarios/registrar").authenticated()
                         .requestMatchers(HttpMethod.POST, "/api/productos").hasAuthority("ADMIN")
