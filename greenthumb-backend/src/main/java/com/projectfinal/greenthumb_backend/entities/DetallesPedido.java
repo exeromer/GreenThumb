@@ -1,6 +1,8 @@
 package com.projectfinal.greenthumb_backend.entities;
 
 import jakarta.persistence.*;
+
+import java.math.BigDecimal;
 import java.util.Objects;
 
 @Entity
@@ -23,6 +25,9 @@ public class DetallesPedido {
     @Column(name = "CantidadComprada", nullable = false)
     private Integer cantidadComprada;
 
+    @Column(name = "PrecioUnitarioAlComprar", nullable = false, precision = 10, scale = 2)
+    private BigDecimal precioUnitarioAlComprar;
+
     // Constructores, Getters, Setters, equals, hashCode, toString...
     public DetallesPedido() {}
 
@@ -41,6 +46,13 @@ public class DetallesPedido {
     public void setProducto(Producto producto) { this.producto = producto; }
     public Integer getCantidadComprada() { return cantidadComprada; }
     public void setCantidadComprada(Integer cantidadComprada) { this.cantidadComprada = cantidadComprada; }
+    public BigDecimal getPrecioUnitarioAlComprar() {
+        return precioUnitarioAlComprar;
+    }
+
+    public void setPrecioUnitarioAlComprar(BigDecimal precioUnitarioAlComprar) {
+        this.precioUnitarioAlComprar = precioUnitarioAlComprar;
+    }
 
     @Override
     public boolean equals(Object o) {

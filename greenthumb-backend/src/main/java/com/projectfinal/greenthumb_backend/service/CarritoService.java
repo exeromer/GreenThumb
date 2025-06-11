@@ -1,34 +1,14 @@
 // greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/service/CarritoService.java
 package com.projectfinal.greenthumb_backend.service;
 
-import com.projectfinal.greenthumb_backend.entities.CarritoItem;
-import com.projectfinal.greenthumb_backend.entities.CarritoItemId;
-import com.projectfinal.greenthumb_backend.entities.Cliente;
-import com.projectfinal.greenthumb_backend.entities.Producto;
-import com.projectfinal.greenthumb_backend.entities.PrecioProductoActual;
-import com.projectfinal.greenthumb_backend.entities.ImagenesProducto;
-import com.projectfinal.greenthumb_backend.entities.Pedido;
-import com.projectfinal.greenthumb_backend.entities.DetallesPedido;
-import com.projectfinal.greenthumb_backend.entities.EstadosPedido;
-import com.projectfinal.greenthumb_backend.entities.MovimientosStock;
-import com.projectfinal.greenthumb_backend.entities.TiposMovimientoStock;
-import com.projectfinal.greenthumb_backend.entities.Administrador;
+import com.projectfinal.greenthumb_backend.dto.CarritoVistaDTO;
+import com.projectfinal.greenthumb_backend.entities.*;
 
 import com.projectfinal.greenthumb_backend.dto.CarritoItemDTO;
 import com.projectfinal.greenthumb_backend.dto.PedidoDTO;
 import com.projectfinal.greenthumb_backend.dto.DetallePedidoDTO;
 
-import com.projectfinal.greenthumb_backend.repositories.CarritoItemRepository;
-import com.projectfinal.greenthumb_backend.repositories.ClienteRepository;
-import com.projectfinal.greenthumb_backend.repositories.ProductoRepository;
-import com.projectfinal.greenthumb_backend.repositories.PrecioProductoActualRepository;
-import com.projectfinal.greenthumb_backend.repositories.ImagenesProductoRepository;
-import com.projectfinal.greenthumb_backend.repositories.PedidoRepository;
-import com.projectfinal.greenthumb_backend.repositories.DetallesPedidoRepository;
-import com.projectfinal.greenthumb_backend.repositories.EstadosPedidoRepository;
-import com.projectfinal.greenthumb_backend.repositories.MovimientosStockRepository;
-import com.projectfinal.greenthumb_backend.repositories.TiposMovimientoStockRepository;
-import com.projectfinal.greenthumb_backend.repositories.AdministradorRepository;
+import com.projectfinal.greenthumb_backend.repositories.*;
 
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -45,18 +25,30 @@ import java.util.stream.Collectors;
 @Service
 public class CarritoService {
 
+    @Autowired
     private final CarritoItemRepository carritoItemRepository;
+    @Autowired
     private final ClienteRepository clienteRepository;
+    @Autowired
     private final ProductoRepository productoRepository;
+    @Autowired
     private final PrecioProductoActualRepository precioProductoActualRepository;
+    @Autowired
     private final ImagenesProductoRepository imagenesProductoRepository;
+    @Autowired
     private final PedidoRepository pedidoRepository;
+    @Autowired
     private final DetallesPedidoRepository detallesPedidoRepository;
+    @Autowired
     private final EstadosPedidoRepository estadosPedidoRepository;
+    @Autowired
     private final MovimientosStockRepository movimientosStockRepository;
+    @Autowired
     private final TiposMovimientoStockRepository tiposMovimientoStockRepository;
+    @Autowired
     private final AdministradorRepository administradorRepository;
-
+    @Autowired
+    private final HistorialEstadosPedidoRepository historialEstadosPedidoRepository;
 
     @Autowired
     public CarritoService(CarritoItemRepository carritoItemRepository,
@@ -69,7 +61,8 @@ public class CarritoService {
                           EstadosPedidoRepository estadosPedidoRepository,
                           MovimientosStockRepository movimientosStockRepository,
                           TiposMovimientoStockRepository tiposMovimientoStockRepository,
-                          AdministradorRepository administradorRepository) {
+                          AdministradorRepository administradorRepository,
+                          HistorialEstadosPedidoRepository historialEstadosPedidoRepository) {
         this.carritoItemRepository = carritoItemRepository;
         this.clienteRepository = clienteRepository;
         this.productoRepository = productoRepository;
@@ -81,6 +74,7 @@ public class CarritoService {
         this.movimientosStockRepository = movimientosStockRepository;
         this.tiposMovimientoStockRepository = tiposMovimientoStockRepository;
         this.administradorRepository = administradorRepository;
+        this.historialEstadosPedidoRepository = historialEstadosPedidoRepository;
     }
 
     // 1. Agregar Producto al Carrito
@@ -180,98 +174,99 @@ public class CarritoService {
         carritoItemRepository.deleteByCliente(cliente);
     }
 
-    // Nuevo método para confirmar el carrito como un pedido
     @Transactional
-    public PedidoDTO confirmarCarritoComoPedido(Integer clienteId, String metodoPago, String notasCliente) {
-        Cliente cliente = clienteRepository.findById(clienteId)
-                .orElseThrow(() -> new RuntimeException("Cliente no encontrado con ID: " + clienteId));
+    public PedidoDTO confirmarCarritoComoPedido(Cliente cliente, String metodoPago, String notasCliente) {
+        List<CarritoItem> itemsDelCarrito = carritoItemRepository.findByClienteUsuarioId((long)cliente.getUsuarioId());
 
-        List<CarritoItem> carritoItems = carritoItemRepository.findByCliente(cliente);
-        if (carritoItems.isEmpty()) {
-            throw new IllegalArgumentException("El carrito del cliente está vacío. No se puede crear un pedido.");
+        if (itemsDelCarrito.isEmpty()) {
+            throw new IllegalStateException("El carrito está vacío, no se puede crear un pedido.");
         }
 
-        // Obtener el estado "Pendiente"
         EstadosPedido estadoPendiente = estadosPedidoRepository.findByNombreEstado("Pendiente")
-                .orElseThrow(() -> new RuntimeException("Estado de pedido 'Pendiente' no encontrado."));
+                .orElseThrow(() -> new RuntimeException("Estado 'Pendiente' no encontrado."));
 
-        // Obtener el tipo de movimiento de stock "Venta Cliente"
-        TiposMovimientoStock ventaClienteTipoMov = tiposMovimientoStockRepository.findByDescripcionTipoMovimiento("Venta Cliente")
-                .orElseThrow(() -> new RuntimeException("Tipo de movimiento 'Venta Cliente' no encontrado."));
-
-        // Obtener un administrador por defecto (ajustar esto con Spring Security real)
-        // Asumiendo que el admin con ID 1 existe o se puede crear uno por defecto en DataInitializer
-        Administrador admin = administradorRepository.findById(1)
-                .orElseGet(() -> {
-                    return administradorRepository.findByEmail("admin@greenthumb.com")
-                            .orElseThrow(() -> new RuntimeException("No se encontró un administrador para registrar movimientos de stock."));
-                });
-
-
-        // Crear el nuevo pedido
         Pedido nuevoPedido = new Pedido();
         nuevoPedido.setCliente(cliente);
+        nuevoPedido.setFechaPedido(LocalDateTime.now());
         nuevoPedido.setEstadoPedido(estadoPendiente);
         nuevoPedido.setMetodoPagoSimulado(metodoPago);
         nuevoPedido.setNotasCliente(notasCliente != null ? notasCliente : "");
+        nuevoPedido.setNotasAdmin("");
 
-        // Guardar el pedido para obtener su ID antes de añadir detalles
-        nuevoPedido = pedidoRepository.save(nuevoPedido);
+        Pedido pedidoGuardado = pedidoRepository.save(nuevoPedido);
 
-        List<DetallePedidoDTO> detallesDTO = new ArrayList<>();
-
-        for (CarritoItem item : carritoItems) {
+        List<DetallesPedido> detallesParaGuardar = new ArrayList<>();
+        for (CarritoItem item : itemsDelCarrito) {
             Producto producto = item.getProducto();
-            Integer cantidadDeseada = item.getCantidad();
+            int cantidadComprada = item.getCantidad();
 
-            // 1. Validar Stock
-            if (producto.getStockActual() < cantidadDeseada) {
-                throw new IllegalArgumentException("Stock insuficiente para el producto: " + producto.getNombreProducto() + ". Cantidad disponible: " + producto.getStockActual());
+            if (producto.getStockActual() < cantidadComprada) {
+                throw new IllegalStateException("No hay suficiente stock para el producto: " + producto.getNombreProducto());
             }
 
-            // 2. Crear DetallesPedido
-            DetallesPedido detallePedido = new DetallesPedido(nuevoPedido, producto, cantidadDeseada);
-            detallesPedidoRepository.save(detallePedido);
-            nuevoPedido.addDetalle(detallePedido);
-
-            // 3. Actualizar Stock del Producto
-            Integer stockPrevio = producto.getStockActual();
-            producto.setStockActual(stockPrevio - cantidadDeseada);
+            // Actualizar stock del producto
+            int stockPrevio = producto.getStockActual();
+            producto.setStockActual(stockPrevio - cantidadComprada);
             productoRepository.save(producto);
 
-            // 4. Registrar Movimiento de Stock
-            MovimientosStock movimientoStock = new MovimientosStock(
-                    producto,
-                    ventaClienteTipoMov,
-                    -cantidadDeseada,
-                    stockPrevio,
-                    producto.getStockActual(),
-                    admin,
-                    "Venta por pedido ID: " + nuevoPedido.getPedidoId()
-            );
-            movimientosStockRepository.save(movimientoStock);
+            // Crear detalle de pedido
+            DetallesPedido detalle = new DetallesPedido();
+            detalle.setPedido(pedidoGuardado);
+            detalle.setProducto(producto);
+            detalle.setCantidadComprada(cantidadComprada);
+            // Guardamos el precio al momento de la compra para mantener un registro histórico fiel.
+            detalle.setPrecioUnitarioAlComprar(producto.getPrecioActual().getPrecioVenta());
+            detallesParaGuardar.add(detalle);
 
-            // Añadir a la lista de DTOs para la respuesta
-            detallesDTO.add(new DetallePedidoDTO(
-                    producto.getProductoId(),
-                    producto.getNombreProducto(),
-                    cantidadDeseada,
-                    item.getPrecioAlAgregar()
-            ));
+            // Crear movimiento de stock por venta
+            TiposMovimientoStock tipoVenta = tiposMovimientoStockRepository.findByDescripcionTipoMovimiento("Venta Cliente")
+                    .orElseThrow(() -> new RuntimeException("Tipo de movimiento 'Venta Cliente' no encontrado."));
+            MovimientosStock mov = new MovimientosStock(producto, tipoVenta, -cantidadComprada, stockPrevio, producto.getStockActual(), null, "Venta en pedido #" + pedidoGuardado.getPedidoId());
+            movimientosStockRepository.save(mov);
         }
 
-        // 5. Vaciar el carrito después de procesar todos los ítems
-        carritoItemRepository.deleteByCliente(cliente);
+        detallesPedidoRepository.saveAll(detallesParaGuardar);
 
-        // Mapear el Pedido recién creado a un PedidoDTO para la respuesta
-        return mapPedidoToDTO(nuevoPedido, detallesDTO);
+        // Crear historial de estado inicial
+        HistorialEstadosPedido historial = new HistorialEstadosPedido(pedidoGuardado, estadoPendiente, null, "Pedido creado por el cliente.");
+        historialEstadosPedidoRepository.save(historial);
+
+        // Vaciar el carrito
+        carritoItemRepository.deleteAll(itemsDelCarrito);
+
+        return mapPedidoToDTO(pedidoGuardado); // Usamos un mapper
     }
 
+    public CarritoVistaDTO getCarrito(Long clienteId) {
+        List<CarritoItem> itemsEntidad = carritoItemRepository.findByClienteUsuarioId(clienteId);
+
+        List<CarritoItemDTO> itemsDto = itemsEntidad.stream()
+                .map(item -> new CarritoItemDTO(
+                        item.getProducto().getProductoId(),
+                        item.getProducto().getNombreProducto(),
+                        item.getCantidad(),
+                        item.getPrecioAlAgregar(),
+                        item.getProducto().getImagenes().isEmpty() ? null : item.getProducto().getImagenes().get(0).getUrlImagen()
+                ))
+                .collect(Collectors.toList());
+
+        int itemCount = itemsDto.stream().mapToInt(CarritoItemDTO::getCantidad).sum();
+
+        double total = itemsDto.stream()
+                .mapToDouble(item -> item.getPrecioUnitario() * item.getCantidad())
+                .sum();
+
+        CarritoVistaDTO carritoVista = new CarritoVistaDTO();
+        carritoVista.setItems(itemsDto);
+        carritoVista.setItemCount(itemCount);
+        carritoVista.setTotal(total);
+
+        return carritoVista;
+    }
 
     // Método auxiliar para mapear CarritoItem a CarritoItemDTO
     private CarritoItemDTO mapToCarritoItemDTO(CarritoItem carritoItem) {
         CarritoItemDTO dto = new CarritoItemDTO();
-        dto.setClienteId(carritoItem.getCliente().getUsuarioId());
         dto.setProductoId(carritoItem.getProducto().getProductoId());
         dto.setCantidad(carritoItem.getCantidad());
         dto.setNombreProducto(carritoItem.getProducto().getNombreProducto());
@@ -288,7 +283,18 @@ public class CarritoService {
     }
 
     // Método auxiliar para mapear Pedido a PedidoDTO
-    private PedidoDTO mapPedidoToDTO(Pedido pedido, List<DetallePedidoDTO> detallesDTO) {
+    private PedidoDTO mapPedidoToDTO(Pedido pedido) {
+        // 1. Mapeamos la lista de entidades DetallesPedido a una lista de DetallePedidoDTO
+        List<DetallePedidoDTO> detallesDTO = pedido.getDetalles().stream()
+                .map(detalle -> new DetallePedidoDTO(
+                        detalle.getProducto().getProductoId(),
+                        detalle.getProducto().getNombreProducto(),
+                        detalle.getCantidadComprada(),
+                        detalle.getPrecioUnitarioAlComprar()
+                ))
+                .collect(Collectors.toList());
+
+        // 2. Ahora creamos el DTO principal y le pasamos la lista que acabamos de crear
         PedidoDTO dto = new PedidoDTO();
         dto.setPedidoId(pedido.getPedidoId());
         dto.setClienteId(pedido.getCliente().getUsuarioId());
@@ -297,7 +303,8 @@ public class CarritoService {
         dto.setEstadoPedido(pedido.getEstadoPedido().getNombreEstado());
         dto.setMetodoPagoSimulado(pedido.getMetodoPagoSimulado());
         dto.setNotasCliente(pedido.getNotasCliente());
-        dto.setDetalles(detallesDTO);
+        dto.setDetalles(detallesDTO); // <-- Ahora 'detallesDTO' existe y es válido
+
         return dto;
     }
 }

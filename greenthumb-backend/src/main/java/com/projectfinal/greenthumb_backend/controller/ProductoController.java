@@ -1,96 +1,97 @@
 package com.projectfinal.greenthumb_backend.controller;
 
-import com.projectfinal.greenthumb_backend.dto.ProductoCreacionRequestDTO;
-import com.projectfinal.greenthumb_backend.dto.ProductoDetalleDTO;
-import com.projectfinal.greenthumb_backend.dto.ProductoListadoDTO;
-import com.projectfinal.greenthumb_backend.dto.ProductoActualizacionRequestDTO;
-import com.projectfinal.greenthumb_backend.entities.Producto; // Para el request body
+import com.projectfinal.greenthumb_backend.dto.*;
+import com.projectfinal.greenthumb_backend.entities.Usuario;
+import com.projectfinal.greenthumb_backend.service.AuthService;
 import com.projectfinal.greenthumb_backend.service.ProductoService;
-import org.springframework.http.HttpStatus; // Importar HttpStatus
-import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import java.math.BigDecimal;
-import java.util.Optional;
+import java.util.Map;
 
 @RestController
-@RequestMapping("/api/productos") // Simplificado, como hiciste con categorías
+@RequestMapping("/api/productos")
 public class ProductoController {
 
     private final ProductoService productoService;
-    private static final Integer DEFAULT_ADMIN_ID = 1; // Temporal
+    private final AuthService authService; // 1. Inyectamos AuthService para buscar usuarios
 
+    // Eliminamos la constante de ID hardcodeado
+    // private static final Integer DEFAULT_ADMIN_ID = 1; 
 
     @Autowired
-    public ProductoController(ProductoService productoService) {
+    public ProductoController(ProductoService productoService, AuthService authService) { // 2. Lo añadimos al constructor
         this.productoService = productoService;
+        this.authService = authService;
     }
 
-    // GET /api/productos?page=0&size=10&sort=nombreProducto,asc&categoriaId=1&nombre=Helecho
+    // --- ENDPOINTS PÚBLICOS (GET) ---
+    // Estos métodos no cambian porque son públicos
     @GetMapping
-    public ResponseEntity<Page<ProductoListadoDTO>> listarProductos(
-            @PageableDefault(size = 10, sort = "nombreProducto") Pageable pageable,
-            @RequestParam(required = false) Integer categoriaId,
-            @RequestParam(required = false) String nombre) {
-        Page<ProductoListadoDTO> productos = productoService.getAllActiveProductos(pageable, categoriaId, nombre);
-        if (productos.isEmpty()) {
-            return ResponseEntity.noContent().build();
-        }
-        return ResponseEntity.ok(productos);
+    public ResponseEntity<Page<ProductoListadoDTO>> listarProductos(@PageableDefault(size = 10, page = 0) Pageable pageable, @RequestParam(required = false) Integer categoriaId) {
+        return ResponseEntity.ok(productoService.getAllActiveProductos(pageable, categoriaId, null));
     }
 
-    // GET /api/productos/1
     @GetMapping("/{id}")
     public ResponseEntity<ProductoDetalleDTO> obtenerProductoPorId(@PathVariable Integer id) {
-        Optional<ProductoDetalleDTO> productoDTO = productoService.getActiveProductoByIdDTO(id);
-        return productoDTO.map(ResponseEntity::ok)
-                .orElseGet(() -> ResponseEntity.notFound().build());
+        return productoService.getActiveProductoByIdDTO(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
+    // --- ENDPOINTS PROTEGIDOS (SOLO ADMIN) ---
 
     @PostMapping
-    public ResponseEntity<?> crearProducto(@RequestBody ProductoCreacionRequestDTO requestDTO) {
-        // El ID del administrador debería obtenerse del contexto de seguridad una vez implementado
-        // Por ahora, usamos un ID por defecto si es necesario para las pruebas iniciales.
-        // El DEFAULT_ADMIN_ID ya está definido en tu clase.
+    public ResponseEntity<?> crearProducto(@RequestBody ProductoCreacionRequestDTO requestDTO, @AuthenticationPrincipal Jwt principal) {
         try {
-            ProductoDetalleDTO nuevoProductoDTO = productoService.createProducto(requestDTO, DEFAULT_ADMIN_ID);
-            return ResponseEntity.status(HttpStatus.CREATED).body(nuevoProductoDTO);
-        } catch (IllegalArgumentException e) {
-            // Errores de validación de datos de entrada
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
-        } catch (RuntimeException e) {
-            // Otros errores, como "Categoría no encontrada" o problemas de base de datos
-            // Es buena idea loggear la excepción completa en el servidor para depuración
-            e.printStackTrace(); // Log para el desarrollador
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error interno al crear el producto: " + e.getMessage()));
+            // 3. Obtenemos el usuario real desde el token
+            Usuario adminUsuario = authService.findUsuarioByAuth0Id(principal.getSubject())
+                    .orElseThrow(() -> new RuntimeException("Admin no encontrado"));
+
+            // 4. Pasamos el objeto Usuario al servicio
+            ProductoDetalleDTO nuevoProducto = productoService.createProducto(requestDTO, adminUsuario);
+            return new ResponseEntity<>(nuevoProducto, HttpStatus.CREATED);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-    @PutMapping("/{id}")
-    public ResponseEntity<?> actualizarProducto(@PathVariable Integer id, @RequestBody ProductoActualizacionRequestDTO requestDTO) {
-        try {
-            Optional<ProductoDetalleDTO> productoActualizado = productoService.updateProductoDTO(id, requestDTO, DEFAULT_ADMIN_ID);
 
-            return productoActualizado.map(ResponseEntity::ok)
+    @PutMapping("/{id}")
+    public ResponseEntity<?> actualizarProducto(@PathVariable Integer id, @RequestBody ProductoActualizacionRequestDTO requestDTO, @AuthenticationPrincipal Jwt principal) {
+        try {
+            // 3. Obtenemos el usuario real desde el token
+            Usuario adminUsuario = authService.findUsuarioByAuth0Id(principal.getSubject())
+                    .orElseThrow(() -> new RuntimeException("Admin no encontrado"));
+
+            // 4. Pasamos el objeto Usuario al servicio
+            return productoService.updateProductoDTO(id, requestDTO, adminUsuario)
+                    .map(ResponseEntity::ok)
                     .orElseGet(() -> ResponseEntity.notFound().build());
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
-        } catch (RuntimeException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error al actualizar el producto: " + e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<?> borrarProducto(@PathVariable Integer id, @RequestBody(required = false) Map<String, String> payload) {
-        String motivoBaja = (payload != null) ? payload.get("motivoBaja") : "Baja desde API";
+    public ResponseEntity<?> borrarProducto(@PathVariable Integer id, @RequestBody(required = false) Map<String, String> payload, @AuthenticationPrincipal Jwt principal) {
         try {
-            boolean borradoExitoso = productoService.softDeleteProducto(id, motivoBaja, DEFAULT_ADMIN_ID);
+            // 3. Obtenemos el usuario real desde el token
+            Usuario adminUsuario = authService.findUsuarioByAuth0Id(principal.getSubject())
+                    .orElseThrow(() -> new RuntimeException("Admin no encontrado"));
+
+            String motivoBaja = (payload != null) ? payload.get("motivoBaja") : "Baja desde API";
+
+            // 4. Pasamos el objeto Usuario al servicio
+            boolean borradoExitoso = productoService.softDeleteProducto(id, motivoBaja, adminUsuario);
+
             if (borradoExitoso) {
                 return ResponseEntity.ok().build();
             } else {
@@ -98,6 +99,16 @@ public class ProductoController {
             }
         } catch (RuntimeException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{id}/imagen")
+    public ResponseEntity<?> subirImagenProducto(@PathVariable Integer id, @RequestParam("file") MultipartFile file) {
+        try {
+            ImagenProductoDTO imagenDTO = productoService.addImagenToProducto(id, file);
+            return ResponseEntity.status(HttpStatus.CREATED).body(imagenDTO);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
 }

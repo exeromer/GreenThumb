@@ -3,12 +3,14 @@ package com.projectfinal.greenthumb_backend.service;
 import com.projectfinal.greenthumb_backend.dto.*;
 import com.projectfinal.greenthumb_backend.entities.*;
 import com.projectfinal.greenthumb_backend.repositories.*;
+import com.projectfinal.greenthumb_backend.service.FileStorageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -32,6 +34,7 @@ public class ProductoService {
     private final MovimientosStockRepository movimientosStockRepository;
     private final PrecioProductoHistorialRepository precioProductoHistorialRepository;
     private final CostoProductoHistorialRepository costoProductoHistorialRepository;
+    private final FileStorageService fileStorageService;
 
     // Repositorios para detalles específicos
     private final DetallesPlantaRepository detallesPlantaRepository;
@@ -58,7 +61,8 @@ public class ProductoService {
                            NivelesLuzRepository nivelesLuzRepository,
                            FrecuenciasRiegoRepository frecuenciasRiegoRepository,
                            PrecioProductoHistorialRepository precioProductoHistorialRepository,
-                           CostoProductoHistorialRepository costoProductoHistorialRepository) {
+                           CostoProductoHistorialRepository costoProductoHistorialRepository,
+                           FileStorageService fileStorageService) {
         this.productoRepository = productoRepository;
         this.registroBajaRepository = registroBajaRepository;
         this.administradorRepository = administradorRepository;
@@ -76,6 +80,7 @@ public class ProductoService {
         this.costoProductoHistorialRepository = costoProductoHistorialRepository;
         this.nivelesLuzRepository = nivelesLuzRepository;
         this.frecuenciasRiegoRepository = frecuenciasRiegoRepository;
+        this.fileStorageService = fileStorageService;
     }
 
     // --- Helper para convertir a ProductoListadoDTO ---
@@ -220,27 +225,15 @@ public class ProductoService {
     }
 
     @Transactional // Muy importante para asegurar la atomicidad
-    public ProductoDetalleDTO createProducto(ProductoCreacionRequestDTO requestDTO, Integer adminId) {
-
-        Optional<Administrador> adminOpt = administradorRepository.findById(adminId);
-        if (adminOpt.isEmpty()) {
-            throw new RuntimeException("Administrador no encontrado con ID: " + adminId);
+    public ProductoDetalleDTO createProducto(ProductoCreacionRequestDTO requestDTO, Usuario adminUsuario) {
+        // 1. Validamos que el usuario es un administrador
+        if (!(adminUsuario instanceof Administrador)) {
+            throw new IllegalStateException("Solo los administradores pueden crear productos.");
         }
-        Administrador admin = adminOpt.get();
-
+        Administrador admin = (Administrador) adminUsuario; // Hacemos el cast para usarlo después
         if (requestDTO.getCategoriaId() == null || requestDTO.getTipoProductoId() == null) {
             throw new IllegalArgumentException("Los IDs de Categoría y Tipo de Producto son obligatorios.");
         }
-        if (requestDTO.getNombreProducto() == null || requestDTO.getNombreProducto().trim().isEmpty()) {
-            throw new IllegalArgumentException("El nombre del producto es obligatorio.");
-        }
-        // Validación de nombre de producto único (entre productos activos)
-        Optional<Producto> productoExistente = productoRepository.findByNombreProducto(requestDTO.getNombreProducto());
-        if (productoExistente.isPresent() &&
-                registroBajaRepository.findByNombreTablaAndRegistroId("productos", productoExistente.get().getProductoId()).isEmpty()) {
-            throw new IllegalArgumentException("Ya existe un producto activo con el nombre: " + requestDTO.getNombreProducto());
-        }
-
 
         Categoria categoria = categoriaRepository.findById(requestDTO.getCategoriaId())
                 .orElseThrow(() -> new RuntimeException("Categoría no encontrada con ID: " + requestDTO.getCategoriaId()));
@@ -254,22 +247,15 @@ public class ProductoService {
         nuevoProducto.setPuntoDeReorden(requestDTO.getPuntoDeReorden() != null ? requestDTO.getPuntoDeReorden() : 0);
         nuevoProducto.setCategoria(categoria);
         nuevoProducto.setTipoProducto(tipoProducto);
-        // fechaAlta y fechaUltimaModificacion se manejan por @PrePersist/@PreUpdate en la entidad Producto
 
         Producto productoGuardado = productoRepository.save(nuevoProducto);
 
-        // Crear Precio y Costo Actual
-        if (requestDTO.getPrecioVenta() == null || requestDTO.getCosto() == null) {
-            throw new IllegalArgumentException("El precio de venta y el costo son obligatorios.");
-        }
+        // 3. Usamos el objeto 'admin' que obtuvimos del usuario autenticado.
         PrecioProductoActual ppa = new PrecioProductoActual(productoGuardado, requestDTO.getPrecioVenta(), admin);
         precioProductoActualRepository.save(ppa);
-        // La relación bidireccional se establece en el constructor de PrecioProductoActual o se puede setear aquí si es necesario
-        // y si Producto es el dueño de la relación, pero con @MapsId en PrecioProductoActual, ya está vinculado.
 
         CostoProductoActual cpa = new CostoProductoActual(productoGuardado, requestDTO.getCosto(), admin);
         costoProductoActualRepository.save(cpa);
-        // Igual para CostoProductoActual
 
         // Guardar Detalles Específicos
         // La entidad TipoProducto tiene el campo tablaDetalleAsociada que nos dice qué tipo de detalle es
@@ -308,9 +294,8 @@ public class ProductoService {
                     dsDTO.getProfundidadSiembraCM(), dsDTO.getTiempoGerminacionDias(), dsDTO.getInstruccionesSiembra());
             detallesSemillaRepository.save(ds);
         }
-        // ... (manejar otros tipos de producto si existen)
 
-        // Crear movimiento de stock inicial
+        // 4. Usamos el objeto 'admin' también para el movimiento de stock.
         TiposMovimientoStock ingresoInicial = tiposMovimientoStockRepository.findByDescripcionTipoMovimiento("Ingreso Inicial")
                 .orElseThrow(() -> new RuntimeException("Tipo de movimiento 'Ingreso Inicial' no encontrado."));
 
@@ -319,186 +304,57 @@ public class ProductoService {
                 0, productoGuardado.getStockActual(), admin, "Stock inicial por creación de producto.");
         movimientosStockRepository.save(movimiento);
 
-        // Convertir la entidad Producto completamente ensamblada (con sus detalles) a ProductoDetalleDTO
         return convertToDetailDTO(productoGuardado);
     }
 
+    // Dentro de la clase ProductoService
+
     @Transactional
-    public Optional<ProductoDetalleDTO> updateProductoDTO(Integer id, ProductoActualizacionRequestDTO requestDTO, Integer adminId) {
+    public Optional<ProductoDetalleDTO> updateProductoDTO(Integer id, ProductoActualizacionRequestDTO requestDTO, Usuario adminUsuario) {
+        // 1. Buscamos el producto y validamos que exista y esté activo.
         Optional<Producto> productoOpt = productoRepository.findById(id);
         if (productoOpt.isEmpty() || registroBajaRepository.findByNombreTablaAndRegistroId("productos", id).isPresent()) {
-            return Optional.empty(); // No existe o está dado de baja
+            return Optional.empty();
         }
 
-        Administrador admin = administradorRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Administrador no encontrado con ID: " + adminId));
-
+        // 2. Validamos que el usuario sea un administrador.
+        if (!(adminUsuario instanceof Administrador)) {
+            throw new IllegalStateException("Solo los administradores pueden actualizar productos.");
+        }
+        Administrador admin = (Administrador) adminUsuario;
         Producto productoExistente = productoOpt.get();
 
-        // Actualizar campos básicos si se proporcionan en el DTO
-        if (requestDTO.getNombreProducto() != null) {
-            // Validar nombre único si cambia
-            if (!requestDTO.getNombreProducto().equalsIgnoreCase(productoExistente.getNombreProducto())) {
-                Optional<Producto> otroConMismoNombre = productoRepository.findByNombreProducto(requestDTO.getNombreProducto());
-                if (otroConMismoNombre.isPresent() && !otroConMismoNombre.get().getProductoId().equals(id) &&
-                        registroBajaRepository.findByNombreTablaAndRegistroId("productos", otroConMismoNombre.get().getProductoId()).isEmpty()) {
-                    throw new IllegalArgumentException("Ya existe otro producto activo con el nombre: " + requestDTO.getNombreProducto());
-                }
-            }
-            productoExistente.setNombreProducto(requestDTO.getNombreProducto());
-        }
-        if (requestDTO.getDescripcionGeneral() != null) {
-            productoExistente.setDescripcionGeneral(requestDTO.getDescripcionGeneral());
-        }
-        if (requestDTO.getStockActual() != null) {
-            // Aquí deberías considerar si esta es la forma correcta de actualizar stock
-            // o si debe ser a través de un MovimientoStock de ajuste.
-            // Por ahora, lo permitimos directamente si se envía.
-            // Considerar crear un movimiento de ajuste si el stock cambia aquí.
-            if(!productoExistente.getStockActual().equals(requestDTO.getStockActual())) {
-                TiposMovimientoStock tipoAjuste = requestDTO.getStockActual() > productoExistente.getStockActual() ?
-                        tiposMovimientoStockRepository.findByDescripcionTipoMovimiento("Ajuste Positivo").orElse(null) :
-                        tiposMovimientoStockRepository.findByDescripcionTipoMovimiento("Ajuste Negativo").orElse(null);
+        // 3. Llamamos a los métodos privados para cada bloque de lógica.
+        actualizarCamposBasicos(productoExistente, requestDTO);
+        actualizarStock(productoExistente, requestDTO.getStockActual(), admin);
+        actualizarPreciosYCostos(productoExistente, requestDTO, admin);
 
-                if (tipoAjuste != null) {
-                    int cantidadAfectada = requestDTO.getStockActual() - productoExistente.getStockActual();
-                    MovimientosStock movimiento = new MovimientosStock(
-                            productoExistente, tipoAjuste, cantidadAfectada,
-                            productoExistente.getStockActual(), requestDTO.getStockActual(), admin, "Ajuste de stock por actualización de producto.");
-                    movimientosStockRepository.save(movimiento);
-                }
-                productoExistente.setStockActual(requestDTO.getStockActual());
-            }
-        }
-        if (requestDTO.getPuntoDeReorden() != null) {
-            productoExistente.setPuntoDeReorden(requestDTO.getPuntoDeReorden());
+        // Lógica para actualizar detalles específicos (si es necesario)
+        if (requestDTO.getDetallesPlanta() != null || requestDTO.getDetallesHerramienta() != null || requestDTO.getDetallesSemilla() != null) {
+            actualizarDetallesEspecificos(productoExistente, requestDTO);
         }
 
-        // Actualizar Categoría si se proporciona
-        if (requestDTO.getCategoriaId() != null) {
-            Categoria categoria = categoriaRepository.findById(requestDTO.getCategoriaId())
-                    .orElseThrow(() -> new RuntimeException("Categoría no encontrada con ID: " + requestDTO.getCategoriaId()));
-            productoExistente.setCategoria(categoria);
-        }
-
-        // Actualizar Tipo de Producto si se proporciona
-        // ¡CUIDADO! Si se cambia el tipo de producto, la lógica para los detalles específicos se complica.
-        // Habría que eliminar el detalle específico anterior y crear el nuevo.
-        // Por ahora, asumimos que si se cambia el tipo, los detalles específicos también se envían completos para el nuevo tipo.
-        if (requestDTO.getTipoProductoId() != null &&
-                (productoExistente.getTipoProducto() == null || !productoExistente.getTipoProducto().getTipoProductoId().equals(requestDTO.getTipoProductoId()))) {
-
-            TipoProducto nuevoTipo = tipoProductoRepository.findById(requestDTO.getTipoProductoId())
-                    .orElseThrow(() -> new RuntimeException("Tipo de Producto no encontrado con ID: " + requestDTO.getTipoProductoId()));
-
-            // Lógica para eliminar detalles antiguos (si existían y el tipo cambió)
-            // Esto es simplificado. En un caso real, verificarías la tablaDetalleAsociada anterior.
-            detallesPlantaRepository.deleteById(productoExistente.getProductoId()); // Intenta borrar, no falla si no existe
-            detallesHerramientaRepository.deleteById(productoExistente.getProductoId());
-            detallesSemillaRepository.deleteById(productoExistente.getProductoId());
-
-            productoExistente.setTipoProducto(nuevoTipo);
-            // Los nuevos detalles se guardarán más abajo.
-        }
-
-        // Actualizar Precio (si se proporciona)
-        if (requestDTO.getNuevoPrecioVenta() != null) {
-            PrecioProductoActual ppa = productoExistente.getPrecioActual();
-            if (ppa == null) {
-                ppa = precioProductoActualRepository.findById(productoExistente.getProductoId()).orElse(new PrecioProductoActual(productoExistente, requestDTO.getNuevoPrecioVenta(), admin));
-                ppa.setPrecioVenta(requestDTO.getNuevoPrecioVenta()); // Asegurar el precio del DTO
-                ppa.setAdministrador(admin); // Asegurar el admin
-                ppa.setFechaInicioVigencia(LocalDateTime.now()); // Asegurar fecha de inicio
-            } else {
-                if (!ppa.getPrecioVenta().equals(requestDTO.getNuevoPrecioVenta())) {
-                    PrecioProductoHistorial pph = new PrecioProductoHistorial(productoExistente, ppa.getPrecioVenta(), ppa.getFechaInicioVigencia(), LocalDateTime.now(), admin);
-                    precioProductoHistorialRepository.save(pph);
-                    ppa.setPrecioVenta(requestDTO.getNuevoPrecioVenta());
-                    ppa.setFechaInicioVigencia(LocalDateTime.now());
-                    ppa.setAdministrador(admin);
-                }
-            }
-            precioProductoActualRepository.save(ppa);
-            productoExistente.setPrecioActual(ppa); // Asegurar asociación
-        }
-
-        // Actualizar Costo (si se proporciona)
-        if (requestDTO.getNuevoCosto() != null) {
-            CostoProductoActual cpa = productoExistente.getCostoActual();
-            if (cpa == null) {
-                cpa = costoProductoActualRepository.findById(productoExistente.getProductoId()).orElse(new CostoProductoActual(productoExistente, requestDTO.getNuevoCosto(), admin));
-                cpa.setPrecioCosto(requestDTO.getNuevoCosto());
-                cpa.setAdministrador(admin);
-                cpa.setFechaInicioVigencia(LocalDateTime.now());
-            } else {
-                if (!cpa.getPrecioCosto().equals(requestDTO.getNuevoCosto())) {
-                    CostoProductoHistorial cph = new CostoProductoHistorial(productoExistente, cpa.getPrecioCosto(), cpa.getFechaInicioVigencia(), LocalDateTime.now(), admin);
-                    costoProductoHistorialRepository.save(cph);
-                    cpa.setPrecioCosto(requestDTO.getNuevoCosto());
-                    cpa.setFechaInicioVigencia(LocalDateTime.now());
-                    cpa.setAdministrador(admin);
-                }
-            }
-            costoProductoActualRepository.save(cpa);
-            productoExistente.setCostoActual(cpa); // Asegurar asociación
-        }
-
-        // Actualizar/Crear Detalles Específicos si se proporcionan en el DTO
-        // Asumimos que si se cambia el tipo de producto, el DTO de detalle correcto se envía.
-        String tablaDetalleAsociadaActual = productoExistente.getTipoProducto().getTablaDetalleAsociada();
-
-        if ("detallesplanta".equalsIgnoreCase(tablaDetalleAsociadaActual) && requestDTO.getDetallesPlanta() != null) {
-            DetallesPlantaDTO dpDTO = requestDTO.getDetallesPlanta();
-            NivelesLuz nivelLuz = nivelesLuzRepository.findByDescripcionNivelLuz(dpDTO.getNivelLuzDescripcion())
-                    .orElseThrow(() -> new RuntimeException("Nivel de luz no encontrado: " + dpDTO.getNivelLuzDescripcion()));
-            FrecuenciasRiego frecuenciaRiego = frecuenciasRiegoRepository.findByDescripcionFrecuenciaRiego(dpDTO.getFrecuenciaRiegoDescripcion())
-                    .orElseThrow(() -> new RuntimeException("Frecuencia de riego no encontrada: " + dpDTO.getFrecuenciaRiegoDescripcion()));
-
-            DetallesPlanta dp = detallesPlantaRepository.findById(productoExistente.getProductoId()).orElse(new DetallesPlanta());
-            dp.setProducto(productoExistente); // Asegurar asociación
-            dp.setNombreCientifico(dpDTO.getNombreCientifico());
-            dp.setTipoAmbiente(dpDTO.getTipoAmbiente());
-            dp.setNivelLuz(nivelLuz);
-            dp.setFrecuenciaRiego(frecuenciaRiego);
-            dp.setEsVenenosa(dpDTO.isEsVenenosa());
-            dp.setCuidadosEspeciales(dpDTO.getCuidadosEspeciales());
-            detallesPlantaRepository.save(dp);
-        } else if ("detallesherramienta".equalsIgnoreCase(tablaDetalleAsociadaActual) && requestDTO.getDetallesHerramienta() != null) {
-            DetallesHerramientaDTO dhDTO = requestDTO.getDetallesHerramienta();
-            DetallesHerramienta dh = detallesHerramientaRepository.findById(productoExistente.getProductoId()).orElse(new DetallesHerramienta());
-            dh.setProducto(productoExistente);
-            dh.setMaterialPrincipal(dhDTO.getMaterialPrincipal());
-            dh.setDimensiones(dhDTO.getDimensiones());
-            dh.setPesoKG(dhDTO.getPesoKG());
-            dh.setUsoRecomendado(dhDTO.getUsoRecomendado());
-            dh.setRequiereMantenimiento(dhDTO.isRequiereMantenimiento());
-            detallesHerramientaRepository.save(dh);
-        } else if ("detallessemilla".equalsIgnoreCase(tablaDetalleAsociadaActual) && requestDTO.getDetallesSemilla() != null) {
-            DetallesSemillaDTO dsDTO = requestDTO.getDetallesSemilla();
-            DetallesSemilla ds = detallesSemillaRepository.findById(productoExistente.getProductoId()).orElse(new DetallesSemilla());
-            ds.setProducto(productoExistente);
-            ds.setEspecieVariedad(dsDTO.getEspecieVariedad());
-            ds.setEpocaSiembraIdeal(dsDTO.getEpocaSiembraIdeal());
-            ds.setProfundidadSiembraCM(dsDTO.getProfundidadSiembraCM());
-            ds.setTiempoGerminacionDias(dsDTO.getTiempoGerminacionDias());
-            ds.setInstruccionesSiembra(dsDTO.getInstruccionesSiembra());
-            detallesSemillaRepository.save(ds);
-        }
-
-        Producto productoActualizado = productoRepository.save(productoExistente); // Guardar cambios en Producto
+        // 4. Guardamos la entidad principal y devolvemos el DTO actualizado.
+        Producto productoActualizado = productoRepository.save(productoExistente);
         return Optional.of(convertToDetailDTO(productoActualizado));
     }
 
 
     @Transactional
-    public boolean softDeleteProducto(Integer id, String motivoBaja, Integer adminId) {
+    public boolean softDeleteProducto(Integer id, String motivoBaja, Usuario adminUsuario) {
         Optional<Producto> productoOpt = productoRepository.findById(id);
         if (productoOpt.isPresent()) {
             if (registroBajaRepository.findByNombreTablaAndRegistroId("productos", id).isPresent()) {
                 return true; // Ya está de baja
             }
-            Administrador admin = administradorRepository.findById(adminId)
-                    .orElseThrow(() -> new RuntimeException("Administrador no encontrado."));
+            // 1. Validamos y obtenemos el administrador
+            if (!(adminUsuario instanceof Administrador)) {
+                throw new IllegalStateException("Solo los administradores pueden dar de baja productos.");
+            }
+            Administrador admin = (Administrador) adminUsuario;
+
+            // 2. Eliminamos la búsqueda por ID
+            // Administrador admin = administradorRepository.findById(adminId).orElseThrow(...); // -- ESTA LÍNEA SE ELIMINA --
 
             RegistroBaja registro = new RegistroBaja("productos", id, motivoBaja, admin);
             registroBajaRepository.save(registro);
@@ -507,5 +363,137 @@ public class ProductoService {
         return false;
     }
 
+    @Transactional
+    public ImagenProductoDTO addImagenToProducto(Integer productoId, MultipartFile file) {
+        // 1. Guardar el archivo en el disco y obtener su nombre único
+        String filename = fileStorageService.store(file);
+
+        // 2. Obtener el producto de la base de datos
+        Producto producto = productoRepository.findById(productoId)
+                .orElseThrow(() -> new RuntimeException("Producto no encontrado con ID: " + productoId));
+
+        // 3. Crear la URL pública para acceder a la imagen
+        String urlImagen = "/uploads/" + filename;
+
+        // 4. Crear y guardar la nueva entidad ImagenesProducto
+        ImagenesProducto nuevaImagen = new ImagenesProducto(producto, urlImagen, producto.getNombreProducto());
+        imagenesProductoRepository.save(nuevaImagen);
+
+        // 5. Devolver un DTO con la información de la imagen recién creada
+        return new ImagenProductoDTO(nuevaImagen.getImagenId(), nuevaImagen.getUrlImagen(), nuevaImagen.getTextoAlternativo());
+    }
+
+    private void actualizarCamposBasicos(Producto producto, ProductoActualizacionRequestDTO dto) {
+        if (dto.getNombreProducto() != null && !dto.getNombreProducto().equalsIgnoreCase(producto.getNombreProducto())) {
+            // Validar nombre único
+            productoRepository.findByNombreProducto(dto.getNombreProducto()).ifPresent(existente -> {
+                if (!existente.getProductoId().equals(producto.getProductoId())) {
+                    throw new IllegalArgumentException("Ya existe otro producto con el nombre: " + dto.getNombreProducto());
+                }
+            });
+            producto.setNombreProducto(dto.getNombreProducto());
+        }
+        if (dto.getDescripcionGeneral() != null) {
+            producto.setDescripcionGeneral(dto.getDescripcionGeneral());
+        }
+        if (dto.getPuntoDeReorden() != null) {
+            producto.setPuntoDeReorden(dto.getPuntoDeReorden());
+        }
+        if (dto.getCategoriaId() != null) {
+            Categoria categoria = categoriaRepository.findById(dto.getCategoriaId())
+                    .orElseThrow(() -> new RuntimeException("Categoría no encontrada con ID: " + dto.getCategoriaId()));
+            producto.setCategoria(categoria);
+        }
+    }
+
+    private void actualizarStock(Producto producto, Integer nuevoStock, Administrador admin) {
+        if (nuevoStock != null && !producto.getStockActual().equals(nuevoStock)) {
+            int stockPrevio = producto.getStockActual();
+            int cantidadAfectada = nuevoStock - stockPrevio;
+
+            String descMovimiento = cantidadAfectada > 0 ? "Ajuste Positivo" : "Ajuste Negativo";
+            TiposMovimientoStock tipoAjuste = tiposMovimientoStockRepository.findByDescripcionTipoMovimiento(descMovimiento)
+                    .orElseThrow(() -> new RuntimeException("Tipo de movimiento no encontrado: " + descMovimiento));
+
+            MovimientosStock movimiento = new MovimientosStock(
+                    producto, tipoAjuste, cantidadAfectada,
+                    stockPrevio, nuevoStock, admin, "Ajuste de stock por actualización de producto.");
+            movimientosStockRepository.save(movimiento);
+
+            producto.setStockActual(nuevoStock);
+        }
+    }
+
+    private void actualizarPreciosYCostos(Producto producto, ProductoActualizacionRequestDTO dto, Administrador admin) {
+        // Actualizar Precio
+        if (dto.getNuevoPrecioVenta() != null) {
+            PrecioProductoActual ppa = precioProductoActualRepository.findById(producto.getProductoId()).orElseGet(() -> new PrecioProductoActual(producto, dto.getNuevoPrecioVenta(), admin));
+            if (!ppa.getPrecioVenta().equals(dto.getNuevoPrecioVenta())) {
+                PrecioProductoHistorial pph = new PrecioProductoHistorial(producto, ppa.getPrecioVenta(), ppa.getFechaInicioVigencia(), LocalDateTime.now(), admin);
+                precioProductoHistorialRepository.save(pph);
+                ppa.setPrecioVenta(dto.getNuevoPrecioVenta());
+                ppa.setFechaInicioVigencia(LocalDateTime.now());
+                ppa.setAdministrador(admin);
+                precioProductoActualRepository.save(ppa);
+            }
+        }
+        // Actualizar Costo
+        if (dto.getNuevoCosto() != null) {
+            CostoProductoActual cpa = costoProductoActualRepository.findById(producto.getProductoId()).orElseGet(() -> new CostoProductoActual(producto, dto.getNuevoCosto(), admin));
+            if (!cpa.getPrecioCosto().equals(dto.getNuevoCosto())) {
+                CostoProductoHistorial cph = new CostoProductoHistorial(producto, cpa.getPrecioCosto(), cpa.getFechaInicioVigencia(), LocalDateTime.now(), admin);
+                costoProductoHistorialRepository.save(cph);
+                cpa.setPrecioCosto(dto.getNuevoCosto());
+                cpa.setFechaInicioVigencia(LocalDateTime.now());
+                cpa.setAdministrador(admin);
+                costoProductoActualRepository.save(cpa);
+            }
+        }
+    }
+// Dentro de la clase ProductoService.java
+
+    private void actualizarDetallesEspecificos(Producto producto, ProductoActualizacionRequestDTO dto) {
+        String tablaDetalle = producto.getTipoProducto().getTablaDetalleAsociada();
+
+        if ("detallesplanta".equalsIgnoreCase(tablaDetalle) && dto.getDetallesPlanta() != null) {
+            DetallesPlantaDTO dpDTO = dto.getDetallesPlanta();
+            NivelesLuz nivelLuz = nivelesLuzRepository.findByDescripcionNivelLuz(dpDTO.getNivelLuzDescripcion()).orElseThrow(() -> new RuntimeException("Nivel de luz no encontrado"));
+            FrecuenciasRiego frecRiego = frecuenciasRiegoRepository.findByDescripcionFrecuenciaRiego(dpDTO.getFrecuenciaRiegoDescripcion()).orElseThrow(() -> new RuntimeException("Frecuencia de riego no encontrada"));
+
+            // --- LÍNEA CORREGIDA ---
+            DetallesPlanta dp = detallesPlantaRepository.findById(producto.getProductoId())
+                    .orElseGet(DetallesPlanta::new); // Usamos el constructor por defecto
+
+            dp.setProducto(producto); // Y luego asignamos el producto
+            dp.setNombreCientifico(dpDTO.getNombreCientifico());
+            dp.setTipoAmbiente(dpDTO.getTipoAmbiente());
+            dp.setNivelLuz(nivelLuz);
+            dp.setFrecuenciaRiego(frecRiego);
+            dp.setEsVenenosa(dpDTO.isEsVenenosa());
+            dp.setCuidadosEspeciales(dpDTO.getCuidadosEspeciales());
+            detallesPlantaRepository.save(dp);
+        }
+        // Añadir bloques "else if" para detallesherramienta y detallessemilla con una lógica similar
+        else if ("detallesherramienta".equalsIgnoreCase(tablaDetalle) && dto.getDetallesHerramienta() != null) {
+            DetallesHerramientaDTO dhDTO = dto.getDetallesHerramienta();
+            DetallesHerramienta dh = detallesHerramientaRepository.findById(producto.getProductoId())
+                    .orElseGet(DetallesHerramienta::new); // Misma corrección
+
+            dh.setProducto(producto);
+            dh.setMaterialPrincipal(dhDTO.getMaterialPrincipal());
+            // ... setear los demás campos de herramienta ...
+            detallesHerramientaRepository.save(dh);
+        }
+        else if ("detallessemilla".equalsIgnoreCase(tablaDetalle) && dto.getDetallesSemilla() != null) {
+            DetallesSemillaDTO dsDTO = dto.getDetallesSemilla();
+            DetallesSemilla ds = detallesSemillaRepository.findById(producto.getProductoId())
+                    .orElseGet(DetallesSemilla::new); // Misma corrección
+
+            ds.setProducto(producto);
+            ds.setEspecieVariedad(dsDTO.getEspecieVariedad());
+            // ... setear los demás campos de semilla ...
+            detallesSemillaRepository.save(ds);
+        }
+    }
 
 }

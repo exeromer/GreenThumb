@@ -3,10 +3,13 @@ package com.projectfinal.greenthumb_backend.entities;
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
 import java.util.Objects;
+import com.projectfinal.greenthumb_backend.listeners.UsuarioEntityListener;
+
 
 @Entity
+@EntityListeners(UsuarioEntityListener.class)
 @Table(name = "usuarios")
-@Inheritance(strategy = InheritanceType.JOINED) // Estrategia para que Cliente y Administrador tengan su propia tabla
+@Inheritance(strategy = InheritanceType.JOINED)
 public abstract class Usuario {
 
     @Id
@@ -23,7 +26,7 @@ public abstract class Usuario {
     @Column(name = "Email", nullable = false, unique = true, length = 255)
     private String email;
 
-    @Column(name = "Contrasena", nullable = false, length = 255)
+    @Column(name = "Contrasena", nullable = false, length = 255) // Almacenar HASH
     private String contrasena;
 
     @Column(name = "Telefono", nullable = false, length = 20)
@@ -35,25 +38,19 @@ public abstract class Usuario {
     @Column(name = "auth0_id", unique = true, length = 255)
     private String auth0Id;
 
-    // --- Constructores ---
-
+    // Constructores
     public Usuario() {
-        // Constructor vacío requerido por JPA
-        this.fechaAlta = LocalDateTime.now();
     }
 
-    public Usuario(String nombre, String apellido, String email, String contrasena, String telefono, String auth0Id) {
+    public Usuario(String nombre, String apellido, String email, String contrasena, String telefono) {
         this.nombre = nombre;
         this.apellido = apellido;
         this.email = email;
         this.contrasena = contrasena;
         this.telefono = telefono;
-        this.auth0Id = auth0Id;
-        this.fechaAlta = LocalDateTime.now();
     }
 
-    // --- Getters y Setters ---
-
+    // Getters y Setters (como los tenías)
     public Integer getUsuarioId() {
         return usuarioId;
     }
@@ -107,31 +104,25 @@ public abstract class Usuario {
     }
 
     public void setFechaAlta(LocalDateTime fechaAlta) {
-        // Generalmente la fecha de alta no se modifica, pero se incluye el setter por completitud
         this.fechaAlta = fechaAlta;
     }
 
-    public String getAuth0Id() {
-        return auth0Id;
-    }
+    public String getAuth0Id() {return auth0Id;}
 
-    public void setAuth0Id(String auth0Id) {
-        this.auth0Id = auth0Id;
-    }
-
-    // --- Métodos de Utilidad (equals, hashCode, toString) ---
+    public void setAuth0Id(String auth0Id) {this.auth0Id = auth0Id;}
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (!(o instanceof Usuario)) return false;
         Usuario usuario = (Usuario) o;
-        return Objects.equals(usuarioId, usuario.usuarioId) && Objects.equals(email, usuario.email);
+        return Objects.equals(getUsuarioId(), usuario.getUsuarioId()) ||
+                (getUsuarioId() == null && Objects.equals(getEmail(), usuario.getEmail()));
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(usuarioId, email);
+        return Objects.hash(getUsuarioId(), getEmail());
     }
 
     @Override
@@ -139,7 +130,9 @@ public abstract class Usuario {
         return "Usuario{" +
                 "usuarioId=" + usuarioId +
                 ", nombre='" + nombre + '\'' +
+                ", apellido='" + apellido + '\'' +
                 ", email='" + email + '\'' +
+                ", fechaAlta=" + fechaAlta +
                 '}';
     }
 }

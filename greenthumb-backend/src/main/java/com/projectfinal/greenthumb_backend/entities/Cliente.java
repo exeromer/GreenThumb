@@ -48,10 +48,8 @@ public class Cliente extends Usuario {
         super();
     }
 
-    public Cliente(String nombre, String apellido, String email, String contrasena, String telefono, String auth0Id, String calle, String numero, String ciudad, String provincia, String codigoPostal) {
-        super(nombre, apellido, email, contrasena, telefono, auth0Id);
-
-        // Finalmente, inicializamos los campos propios de la clase Cliente.
+    public Cliente(String nombre, String apellido, String email, String contrasena, String telefono, String calle, String numero, String ciudad, String provincia, String codigoPostal) {
+        super(nombre, apellido, email, contrasena, telefono);
         this.calle = calle;
         this.numero = numero;
         this.ciudad = ciudad;
@@ -60,6 +58,46 @@ public class Cliente extends Usuario {
     }
 
     // Getters y Setters (como los tenías)
+    public String getcalle() {
+        return calle;
+    }
+
+    public void setcalle(String calle) {
+        this.calle = calle;
+    }
+
+    public String getnumero() {
+        return numero;
+    }
+
+    public void setnumero(String numero) {
+        this.numero = numero;
+    }
+
+    public String getciudad() {
+        return ciudad;
+    }
+
+    public void setciudad(String ciudad) {
+        this.ciudad = ciudad;
+    }
+
+    public String getprovincia() {
+        return provincia;
+    }
+
+    public void setprovincia(String provincia) {
+        this.provincia = provincia;
+    }
+
+    public String getcodigoPostal() {
+        return codigoPostal;
+    }
+
+    public void setcodigoPostal(String codigoPostal) {
+        this.codigoPostal = codigoPostal;
+    }
+
     public String getCalle() {
         return calle;
     }

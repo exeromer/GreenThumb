@@ -1,8 +1,9 @@
 // greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/dto/CarritoItemDTO.java
 package com.projectfinal.greenthumb_backend.dto;
 
+import java.math.BigDecimal;
+
 public class CarritoItemDTO {
-    private Integer clienteId;
     private Integer productoId; // Changed to Long for consistency with CarritoItemId and Producto.productoId
     private Integer cantidad;
     private String nombreProducto; // Para mostrar en el carrito
@@ -14,15 +15,17 @@ public class CarritoItemDTO {
     }
 
     // Constructor con parámetros
-    public CarritoItemDTO(Integer clienteId, Integer productoId, Integer cantidad) {
-        this.clienteId = clienteId;
+    public CarritoItemDTO(Integer productoId, String nombreProducto, Integer cantidad, BigDecimal precioUnitario, String imagenProductoUrl) {
         this.productoId = productoId;
+        this.nombreProducto = nombreProducto;
         this.cantidad = cantidad;
+        // Convertimos de BigDecimal a Double
+        this.precioUnitario = (precioUnitario != null) ? precioUnitario.doubleValue() : null;
+        this.imagenProductoUrl = imagenProductoUrl;
     }
 
     // Constructor con más detalles para la vista del carrito
     public CarritoItemDTO(Integer clienteId, Integer productoId, Integer cantidad, String nombreProducto, Double precioUnitario, String imagenProductoUrl) {
-        this.clienteId = clienteId;
         this.productoId = productoId;
         this.cantidad = cantidad;
         this.nombreProducto = nombreProducto;
@@ -31,13 +34,6 @@ public class CarritoItemDTO {
     }
 
     // Getters y Setters
-    public Integer getClienteId() {
-        return clienteId;
-    }
-
-    public void setClienteId(Integer clienteId) {
-        this.clienteId = clienteId;
-    }
 
     public Integer getProductoId() {
         return productoId;

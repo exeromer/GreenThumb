@@ -2,11 +2,18 @@
 package com.projectfinal.greenthumb_backend.controller;
 
 import com.projectfinal.greenthumb_backend.dto.CarritoItemDTO;
+import com.projectfinal.greenthumb_backend.dto.CarritoVistaDTO;
+import com.projectfinal.greenthumb_backend.dto.CheckoutRequestDTO;
 import com.projectfinal.greenthumb_backend.dto.PedidoDTO;
+import com.projectfinal.greenthumb_backend.entities.Cliente;
+import com.projectfinal.greenthumb_backend.entities.Usuario;
+import com.projectfinal.greenthumb_backend.service.AuthService;
 import com.projectfinal.greenthumb_backend.service.CarritoService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -16,11 +23,16 @@ import java.util.Map;
 @RequestMapping("/api/carrito")
 public class CarritoController {
 
-    private final CarritoService carritoService;
+    @Autowired
+    private CarritoService carritoService;
 
     @Autowired
-    public CarritoController(CarritoService carritoService) {
+    private AuthService authService;
+
+    @Autowired
+    public CarritoController(CarritoService carritoService, AuthService authService) {
         this.carritoService = carritoService;
+        this.authService = authService;
     }
 
     // Endpoint para agregar o actualizar un producto en el carrito
@@ -102,21 +114,50 @@ public class CarritoController {
     } 
     
     // Nuevo endpoint para checkout (confirmar carrito como pedido)
-    @PostMapping("/{clienteId}/checkout")
-    public ResponseEntity<?> checkoutCarrito(
-            @PathVariable Integer clienteId,
-            @RequestBody Map<String, String> checkoutRequest) {
+    @PostMapping("/checkout")
+    public ResponseEntity<?> checkout(@RequestBody CheckoutRequestDTO checkoutRequest, @AuthenticationPrincipal Jwt principal) {
         try {
-            String metodoPago = checkoutRequest.get("metodoPago");
-            String notasCliente = checkoutRequest.get("notasCliente"); // Puede ser null
+            // Usamos el helper para obtener el cliente de forma segura
+            Cliente cliente = getClienteDesdeToken(principal);
 
-            PedidoDTO pedidoConfirmado = carritoService.confirmarCarritoComoPedido(clienteId, metodoPago, notasCliente);
-            return new ResponseEntity<>(pedidoConfirmado, HttpStatus.CREATED);
-        } catch (IllegalArgumentException e) {
+            PedidoDTO pedidoConfirmado = carritoService.confirmarCarritoComoPedido(
+                    cliente, // Pasamos el objeto Cliente completo
+                    checkoutRequest.getMetodoPago(),
+                    checkoutRequest.getNotasCliente()
+            );
+            return ResponseEntity.status(HttpStatus.CREATED).body(pedidoConfirmado);
+        } catch (IllegalStateException e) {
+            // Captura errores como "carrito vacío" o "usuario no es cliente"
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage()));
         } catch (RuntimeException e) {
-            e.printStackTrace();
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error al procesar el pedido: " + e.getMessage()));
+            // Captura otros errores inesperados
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error interno al procesar el pedido."));
         }
     }
+
+    @GetMapping("/items")
+    public ResponseEntity<CarritoVistaDTO> getCarritoItems(@AuthenticationPrincipal Jwt principal) {
+        String auth0Id = principal.getSubject();
+        Usuario usuario = authService.findUsuarioByAuth0Id(auth0Id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con Auth0 ID: " + auth0Id));
+
+        if (!(usuario instanceof Cliente)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        CarritoVistaDTO carrito = carritoService.getCarrito((long) usuario.getUsuarioId());
+        return ResponseEntity.ok(carrito);
+    }
+
+    private Cliente getClienteDesdeToken(Jwt principal) {
+        String auth0Id = principal.getSubject();
+        Usuario usuario = authService.findUsuarioByAuth0Id(auth0Id)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado con Auth0 ID: " + auth0Id));
+
+        if (!(usuario instanceof Cliente)) {
+            throw new IllegalStateException("La operación solo puede ser realizada por un cliente.");
+        }
+        return (Cliente) usuario;
+    }
+
 }

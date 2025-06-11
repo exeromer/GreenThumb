@@ -1,4 +1,3 @@
-// greenthumb-backend/src/main/java/com/projectfinal/greenthumb_backend/repositories/CarritoItemRepository.java
 package com.projectfinal.greenthumb_backend.repositories;
 
 import com.projectfinal.greenthumb_backend.entities.CarritoItem;
@@ -16,6 +15,5 @@ public interface CarritoItemRepository extends JpaRepository<CarritoItem, Carrit
     List<CarritoItem> findByCliente(Cliente cliente);
     Optional<CarritoItem> findByClienteAndProducto(Cliente cliente, Producto producto);
     void deleteByCliente(Cliente cliente); // Added for vaciarCarrito
-    List<CarritoItem> findById_ClienteId(Long clienteId); // Changed to Long for consistency with Cliente.usuarioId
-
+    List<CarritoItem> findByClienteUsuarioId(Long clienteId);
 }

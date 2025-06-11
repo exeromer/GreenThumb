@@ -9,6 +9,7 @@ public class UsuarioDTO {
     private String apellido;
     private String auth0Id;
     private List<String> roles; // Campo para los roles
+    private boolean registroCompleto; // Añadir este flag
 
     // Constructor vacío
     public UsuarioDTO() {}
@@ -36,4 +37,8 @@ public class UsuarioDTO {
     public void setAuth0Id(String auth0Id) { this.auth0Id = auth0Id; }
     public List<String> getRoles() { return roles; }
     public void setRoles(List<String> roles) { this.roles = roles; }
+    public boolean isRegistroCompleto() {return registroCompleto;}
+    public void setRegistroCompleto(boolean registroCompleto) {this.registroCompleto = registroCompleto;}
+
+
 }
